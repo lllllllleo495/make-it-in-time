@@ -131,8 +131,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font-size: 16px;
   line-height: 1.5;
 }
+.route-screen .page-heading { display: flex; align-items: flex-start; flex-direction: column; gap: 9px; }
 .route-screen .page-heading h1 { white-space: nowrap; }
 .route-screen .page-heading h1 span { color: var(--blue); }
+.route-screen .page-heading p { margin: 0; }
 .compact-heading { margin-bottom: 16px; }
 .compact-heading h1 { font-size: clamp(32px, 4vw, 43px); }
 .panel {
@@ -193,6 +195,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   color: var(--muted);
   font-size: 13px;
 }
+.route-form .form-actions { min-height: 62px; padding-top: 8px; padding-bottom: 8px; }
 .spinner {
   width: 16px;
   height: 16px;
@@ -489,7 +492,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .result-buy strong { font-size: 21px; }
 .result-buy small { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
 .ticket-button { min-width: 155px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; font-size: 13px; }
-.ticket-button span { color: inherit; }
 .ticket-action { display: flex; align-items: flex-end; flex-direction: column; gap: 5px; }
 .ticket-unavailable { min-width: 155px; min-height: 44px; display: grid; place-items: center; border-radius: 12px; color: var(--muted); background: var(--surface); font-size: 12px; font-weight: 750; }
 .result-warnings { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px 20px; }
@@ -535,9 +537,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .support-form-grid {
   padding: 22px 20px 24px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 17px 14px;
 }
+.support-actions { justify-content: flex-end; }
 .support-results { margin-top: 16px; display: grid; gap: 14px; }
 .support-actions-panel { padding: 22px; border: 1px solid var(--line); border-radius: 18px; background: #fff; }
 .support-results-heading { margin-bottom: 15px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
@@ -569,6 +572,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .route-fields .field:last-child { grid-column: 1 / -1; }
   .preference-grid { grid-template-columns: minmax(0, 1fr) minmax(190px, .7fr); }
   .baggage-field, .transport-field { grid-column: 1 / -1; }
+  .support-form-grid { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 680px) {
@@ -623,8 +627,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .ticket-action { align-items: stretch; }
   .empty-state { grid-template-columns: 1fr; }
 
-  .support-actions { align-items: stretch; flex-direction: column; }
-  .support-actions > span { margin: 0; }
+  .support-actions { align-items: flex-end; }
   .support-actions .compact-button { width: 100%; }
   .support-actions-panel { padding: 17px; }
   .support-action-item { grid-template-columns: 30px minmax(0, 1fr); }

@@ -63,7 +63,6 @@ type FormState = {
   baggage: Baggage;
   modes: TransportMode[];
   maxPrice: string;
-  departureTime: string;
   airlineId: string;
   sellerId: string;
 };
@@ -77,7 +76,6 @@ const EMPTY_FORM: FormState = {
   baggage: "carry_on",
   modes: ALL_MODES,
   maxPrice: "",
-  departureTime: "",
   airlineId: "",
   sellerId: "",
 };
@@ -93,7 +91,6 @@ const SEARCH_FIELDS = new Set<keyof FormState>([
   "maxPrice",
 ]);
 const SUPPORT_FIELDS = new Set<keyof FormState>([
-  "departureTime",
   "airlineId",
   "sellerId",
 ]);
@@ -338,7 +335,6 @@ export function RescueApp() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           currentPlaceId: place.id,
-          departureTime: form.departureTime || undefined,
           airlineId: form.airlineId || undefined,
           sellerId: form.sellerId || undefined,
         }),
@@ -726,7 +722,6 @@ function PreferencesScreen({
 
   return (
     <main className="flow-screen preferences-screen">
-      <button className="back-button" type="button" onClick={onBack}>← Изменить маршрут</button>
       <section className="page-heading compact-heading">
         <h1>Что учесть?</h1>
         <p>Выберите подходящие условия — и найдём варианты</p>
@@ -1009,15 +1004,13 @@ function TicketButton({ option }: { option: RescueOption }) {
     return (
       <form className="ticket-action" action="/api/checkout" method="post" target="_blank" rel="noopener noreferrer">
         <input type="hidden" name="checkoutRef" value={JSON.stringify(option.checkoutRef)} />
-        <button className="primary-button ticket-button" type="submit">
-          Перейти <span aria-hidden="true">↗</span>
-        </button>
+        <button className="primary-button ticket-button" type="submit">Перейти</button>
       </form>
     );
   }
 
   if (option.bookingUrl) {
-    return <a className="primary-button ticket-button" href={option.bookingUrl} target="_blank" rel="noreferrer">Перейти <span aria-hidden="true">↗</span></a>;
+    return <a className="primary-button ticket-button" href={option.bookingUrl} target="_blank" rel="noreferrer">Перейти</a>;
   }
 
   return <span className="ticket-unavailable">Ссылка недоступна</span>;
@@ -1112,14 +1105,10 @@ function SupportScreen({
               {SELLER_OPTIONS.map((option) => <option value={option.id} key={option.id}>{option.name}</option>)}
             </select>
           </Field>
-          <Field label="Исходный вылет · необязательно" htmlFor="departure-time">
-            <input id="departure-time" type="time" value={form.departureTime} onChange={(event) => onField("departureTime", event.target.value)} />
-          </Field>
         </div>
 
         {supportError && <div className="inline-error" role="alert">{supportError}</div>}
         <div className="form-actions support-actions">
-          <span>Не знаете продавца или время — всё равно покажем доступные контакты</span>
           <button className="primary-button compact-button" type="submit" disabled={isLoading}>{isLoading ? "Проверяем" : "Показать план"}</button>
         </div>
       </form>

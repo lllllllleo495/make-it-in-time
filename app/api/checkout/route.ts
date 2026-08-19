@@ -1,6 +1,20 @@
 import { checkoutRequestSchema } from "../../../lib/domain";
 import { createTutuCheckoutLink } from "../../../lib/providers/tutu-mcp-provider";
 
+function getReliableCheckoutUrl(checkoutUrl: string, checkoutRef: Record<string, unknown>) {
+  const fallback = checkoutRef.search_results_url;
+  if (typeof fallback !== "string") return checkoutUrl;
+
+  try {
+    const checkout = new URL(checkoutUrl);
+    const search = new URL(fallback);
+    const isTutuSearch = search.protocol === "https:" && (search.hostname === "tutu.ru" || search.hostname.endsWith(".tutu.ru"));
+    return checkout.hostname === "mtp-deeplink.tutu.ru" && isTutuSearch ? search.toString() : checkoutUrl;
+  } catch {
+    return checkoutUrl;
+  }
+}
+
 export async function POST(request: Request) {
   const isFormRequest = request.headers.get("content-type")?.includes("application/x-www-form-urlencoded") ?? false;
   const body = isFormRequest
@@ -23,7 +37,7 @@ export async function POST(request: Request) {
   try {
     const checkout = await createTutuCheckoutLink(parsed.data.checkoutRef);
     return isFormRequest
-      ? Response.redirect(checkout.checkoutUrl, 303)
+      ? Response.redirect(getReliableCheckoutUrl(checkout.checkoutUrl, parsed.data.checkoutRef), 303)
       : Response.json(checkout);
   } catch {
     return Response.json(

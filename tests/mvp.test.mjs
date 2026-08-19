@@ -467,7 +467,7 @@ test("Tutu MCP response is normalized into deadline-safe ticket cards", async ()
       body: new URLSearchParams({ checkoutRef: JSON.stringify(body.options[0].checkoutRef) }),
     });
     assert.equal(formCheckoutResponse.status, 303);
-    assert.equal(formCheckoutResponse.headers.get("location"), "https://mtp-deeplink.tutu.ru/exact-flight-cart");
+    assert.equal(formCheckoutResponse.headers.get("location"), "https://avia.tutu.ru/exact-search-url");
     assert.equal(calls.length, 3);
   } finally {
     if (previousProvider === undefined) delete process.env.TRAVEL_PROVIDER;
