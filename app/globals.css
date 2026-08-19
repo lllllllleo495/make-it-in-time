@@ -516,9 +516,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   z-index: 50;
   right: 24px;
   bottom: 22px;
+  width: 200px;
   min-height: 52px;
   display: inline-flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 10px;
   border: 1px solid #142b53;
   border-radius: 100px;
@@ -649,7 +651,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .support-results-heading { flex-direction: column; gap: 6px; }
   .support-action-link { width: 100%; }
   .route-screen .page-heading h1 { font-size: 30px; }
-  .support-launcher { right: 12px; bottom: 12px; min-height: 48px; padding-right: 15px; }
+  .support-launcher { right: 12px; bottom: 12px; width: 190px; min-height: 48px; padding-right: 15px; }
   .support-launcher span { width: 32px; height: 32px; }
 }
 
