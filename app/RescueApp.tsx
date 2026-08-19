@@ -34,6 +34,14 @@ const CITY_OPTIONS = Array.from(new Set(PLACE_OPTIONS.map((place) => place.city)
 const ALL_MODES: TransportMode[] = ["plane", "train", "bus", "suburban"];
 const MIN_SEARCH_DURATION_MS = 1_950;
 
+function apiUrl(path: string) {
+  const runtime = globalThis as typeof globalThis & {
+    __USPET_API_BASE_URL__?: string;
+  };
+  const baseUrl = runtime.__USPET_API_BASE_URL__?.replace(/\/$/u, "") ?? "";
+  return `${baseUrl}${path}`;
+}
+
 const MODE_LABELS: Record<TransportMode, string> = {
   plane: "Самолёт",
   train: "Поезд",
@@ -293,7 +301,7 @@ export function RescueApp() {
     const searchStartedAt = Date.now();
     setIsLoading(true);
     try {
-      const response = await fetch("/api/search", {
+      const response = await fetch(apiUrl("/api/search"), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(buildRequest(form, routeValidation.place)),
@@ -331,7 +339,7 @@ export function RescueApp() {
     setSupportError(null);
     setIsSupportLoading(true);
     try {
-      const response = await fetch("/api/support", {
+      const response = await fetch(apiUrl("/api/support"), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -1019,7 +1027,7 @@ function TicketButton({ option }: { option: RescueOption }) {
       setIsOpening(true);
 
       try {
-        const response = await fetch("/api/checkout", {
+        const response = await fetch(apiUrl("/api/checkout"), {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ checkoutRef: option.checkoutRef }),

@@ -1,5 +1,10 @@
 import { checkoutRequestSchema } from "../../../lib/domain";
 import { createTutuCheckoutLink } from "../../../lib/providers/tutu-mcp-provider";
+import { corsPreflight, jsonWithCors } from "../../../lib/http";
+
+export async function OPTIONS(request: Request) {
+  return corsPreflight(request);
+}
 
 function getReliableCheckoutUrl(checkoutUrl: string, checkoutRef: Record<string, unknown>) {
   const fallback = checkoutRef.search_results_url;
@@ -31,16 +36,17 @@ export async function POST(request: Request) {
   const parsed = checkoutRequestSchema.safeParse(body);
 
   if (!parsed.success) {
-    return Response.json({ error: "Не удалось определить выбранный билет" }, { status: 400 });
+    return jsonWithCors(request, { error: "Не удалось определить выбранный билет" }, { status: 400 });
   }
 
   try {
     const checkout = await createTutuCheckoutLink(parsed.data.checkoutRef);
     return isFormRequest
       ? Response.redirect(getReliableCheckoutUrl(checkout.checkoutUrl, parsed.data.checkoutRef), 303)
-      : Response.json(checkout);
+      : jsonWithCors(request, checkout);
   } catch {
-    return Response.json(
+    return jsonWithCors(
+      request,
       { error: "Не удалось открыть билет, повторите попытку" },
       { status: 502 },
     );

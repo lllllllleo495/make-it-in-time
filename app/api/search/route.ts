@@ -11,13 +11,19 @@ import {
   filterOffers,
   selectRescueOptions,
 } from "../../../lib/search";
+import { corsPreflight, jsonWithCors } from "../../../lib/http";
+
+export async function OPTIONS(request: Request) {
+  return corsPreflight(request);
+}
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const parsed = rescueSearchRequestSchema.safeParse(body);
 
   if (!parsed.success) {
-    return Response.json(
+    return jsonWithCors(
+      request,
       {
         error: "Проверьте исходные данные",
         issues: parsed.error.issues.map((issue) => ({
@@ -34,7 +40,8 @@ export async function POST(request: Request) {
   try {
     offers = await provider.search(parsed.data);
   } catch {
-    return Response.json(
+    return jsonWithCors(
+      request,
       { error: "Не удалось загрузить расписание. Попробуйте ещё раз." },
       { status: 502 },
     );
@@ -52,5 +59,5 @@ export async function POST(request: Request) {
     support: getSupportBundle(parsed.data),
   };
 
-  return Response.json(response);
+  return jsonWithCors(request, response);
 }
