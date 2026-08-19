@@ -19,8 +19,9 @@ export const rescueSearchRequestSchema = z
         type: z.enum(["airport", "station"]),
       }),
       currentTime: z.string().datetime(),
+      timezoneOffsetMinutes: z.number().int().min(-840).max(840).optional(),
       disruptionType: z.enum(["cancelled", "delayed"]),
-      scheduledDeparture: z.string().datetime(),
+      scheduledDeparture: z.string().datetime().optional(),
       newDeparture: z.string().datetime().optional(),
       expectedArrival: z.string().datetime().optional(),
       flightNumber: z.string().max(16).optional(),
@@ -36,7 +37,8 @@ export const rescueSearchRequestSchema = z
       allowOtherPlaces: z.boolean(),
     }),
     preferences: z.object({
-      passengers: z.number().int().min(1).max(9),
+      passengers: z.number().int().min(1).max(6),
+      baggage: z.enum(["none", "carry_on", "checked"]).optional(),
       modes: z.array(transportModeSchema).min(1),
       priority: z.enum(["fastest", "cheapest", "fewest_transfers"]),
       maxPrice: z.number().positive().optional(),
@@ -45,7 +47,6 @@ export const rescueSearchRequestSchema = z
   })
   .superRefine((request, context) => {
     const currentTime = Date.parse(request.incident.currentTime);
-    const scheduledDeparture = Date.parse(request.incident.scheduledDeparture);
     const readyFrom = Date.parse(request.departure.readyFrom);
     const deadline = Date.parse(request.destination.arrivalDeadline);
 
@@ -66,19 +67,10 @@ export const rescueSearchRequestSchema = z
     }
 
     if (
-      request.incident.disruptionType === "delayed" &&
-      !request.incident.newDeparture
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["incident", "newDeparture"],
-        message: "Укажите новое время отправления",
-      });
-    }
-
-    if (
       request.incident.newDeparture &&
-      Date.parse(request.incident.newDeparture) < scheduledDeparture
+      request.incident.scheduledDeparture &&
+      Date.parse(request.incident.newDeparture) <
+        Date.parse(request.incident.scheduledDeparture)
     ) {
       context.addIssue({
         code: "custom",
@@ -103,6 +95,22 @@ export const rescueSearchRequestSchema = z
 
 export type RescueSearchRequest = z.infer<typeof rescueSearchRequestSchema>;
 
+export const supportRequestSchema = z.object({
+  currentPlaceId: z.string().min(1),
+  disruptionType: z.enum(["cancelled", "delayed"]).optional(),
+  departureTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+  airlineId: z.string().optional(),
+  sellerId: z.string().optional(),
+});
+
+export type SupportRequest = z.infer<typeof supportRequestSchema>;
+
+export const checkoutRequestSchema = z.object({
+  checkoutRef: z.record(z.string(), z.unknown()),
+});
+
+export type CheckoutRequest = z.infer<typeof checkoutRequestSchema>;
+
 export type TravelSegment = {
   mode: TransportMode;
   fromCity: string;
@@ -113,6 +121,8 @@ export type TravelSegment = {
   departureAt: string;
   arrivalAt: string;
   carrier: string;
+  voyageNumber?: string;
+  vehicleName?: string;
 };
 
 export type TravelOffer = {
@@ -122,42 +132,66 @@ export type TravelOffer = {
   departureAt: string;
   arrivalAt: string;
   totalPrice: number;
+  currency?: string;
+  priceIsFrom?: boolean;
   transferCount: number;
   seatsLeft?: number;
-  bookingUrl: string;
+  bookingUrl?: string;
+  checkoutRef?: Record<string, unknown>;
+  fareName?: string;
+  luggageSummary?: string;
   source: "fixture" | "tutu-mcp";
 };
 
-export type ResultCategory = "fastest" | "cheapest" | "fewest_transfers";
+export type ResultCategory = "fastest" | "cheapest" | "fewest_transfers" | "fastest_within_budget";
 
 export type RescueOption = TravelOffer & {
   category: ResultCategory;
   deadlineMarginMinutes: number;
 };
 
+export type MissedOption = TravelOffer & {
+  missedDeadlineByMinutes: number;
+};
+
 export type CurrentJourneyStatus = "fits" | "misses" | "unknown" | "cancelled";
 
-export type SupportContact = {
+export type SupportAction = {
   id: string;
-  type: "airline" | "airport" | "seller";
-  name: string;
+  priority: number;
+  category: "flight_status" | "ticket" | "location";
+  entityType: "airline" | "seller" | "location";
+  entityId: string;
+  entityName: string;
+  title: string;
   description: string;
-  phone?: string;
-  hours?: string;
-  websiteUrl: string;
-  supportUrl?: string;
-  sourceUrl: string;
-  lastVerifiedAt: string;
+  actionLabel: string;
+  url: string;
+  contacts: Array<{
+    type: "phone" | "email";
+    label: string;
+    value: string;
+    href: string;
+  }>;
+  contactNote?: string;
+  verifiedAt?: string;
+};
+
+export type SupportResponse = {
+  actions: SupportAction[];
+  misses: Array<{
+    entityType: "airline" | "seller" | "location";
+    entityId: string;
+  }>;
+  departureTime?: string;
 };
 
 export type SearchResponse = {
   options: RescueOption[];
+  nearestAfterDeadline?: MissedOption;
   rejectedCount: number;
   currentJourneyStatus: CurrentJourneyStatus;
   searchedAt: string;
   dataSource: "fixture" | "tutu-mcp";
-  support: {
-    contacts: SupportContact[];
-    actionPlan: string[];
-  };
+  support: SupportResponse;
 };

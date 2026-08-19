@@ -1,5 +1,6 @@
 import type {
   CurrentJourneyStatus,
+  MissedOption,
   RescueOption,
   RescueSearchRequest,
   ResultCategory,
@@ -19,6 +20,11 @@ const categorySorters: Record<
   fewest_transfers: (left, right) =>
     left.transferCount - right.transferCount ||
     Date.parse(left.arrivalAt) - Date.parse(right.arrivalAt),
+  fastest_within_budget: (left, right) =>
+    Date.parse(left.arrivalAt) - Date.parse(left.departureAt) -
+      (Date.parse(right.arrivalAt) - Date.parse(right.departureAt)) ||
+    Date.parse(left.arrivalAt) - Date.parse(right.arrivalAt) ||
+    left.totalPrice - right.totalPrice,
 };
 
 function offerKey(offer: TravelOffer) {
@@ -32,37 +38,69 @@ function offerKey(offer: TravelOffer) {
   ].join("|");
 }
 
+function respectsSearchConstraints(
+  offer: TravelOffer,
+  request: RescueSearchRequest,
+) {
+  const readyFrom = Date.parse(request.departure.readyFrom);
+  const respectsBudget =
+    request.preferences.maxPrice === undefined ||
+    offer.totalPrice <= request.preferences.maxPrice;
+  const respectsTransfers =
+    offer.transferCount <= request.preferences.maxTransfers;
+  const respectsModes = offer.segments.every((segment) =>
+    request.preferences.modes.includes(segment.mode),
+  );
+  const respectsOrigin =
+    request.departure.allowOtherPlaces ||
+    offer.segments[0]?.fromPlaceId === request.incident.currentPlace.id;
+
+  return (
+    Date.parse(offer.departureAt) >= readyFrom &&
+    respectsBudget &&
+    respectsTransfers &&
+    respectsModes &&
+    respectsOrigin
+  );
+}
+
 export function filterOffers(
   offers: TravelOffer[],
   request: RescueSearchRequest,
 ) {
-  const readyFrom = Date.parse(request.departure.readyFrom);
   const deadline = Date.parse(request.destination.arrivalDeadline);
 
-  return offers.filter((offer) => {
-    const departsInTime = Date.parse(offer.departureAt) >= readyFrom;
-    const arrivesInTime = Date.parse(offer.arrivalAt) <= deadline;
-    const respectsBudget =
-      request.preferences.maxPrice === undefined ||
-      offer.totalPrice <= request.preferences.maxPrice;
-    const respectsTransfers =
-      offer.transferCount <= request.preferences.maxTransfers;
-    const respectsModes = offer.segments.every((segment) =>
-      request.preferences.modes.includes(segment.mode),
-    );
-    const respectsOrigin =
-      request.departure.allowOtherPlaces ||
-      offer.segments[0]?.fromPlaceId === request.incident.currentPlace.id;
+  return offers.filter(
+    (offer) =>
+      respectsSearchConstraints(offer, request) &&
+      Date.parse(offer.arrivalAt) <= deadline,
+  );
+}
 
-    return (
-      departsInTime &&
-      arrivesInTime &&
-      respectsBudget &&
-      respectsTransfers &&
-      respectsModes &&
-      respectsOrigin
-    );
-  });
+export function findNearestAfterDeadline(
+  offers: TravelOffer[],
+  request: RescueSearchRequest,
+): MissedOption | undefined {
+  const deadline = Date.parse(request.destination.arrivalDeadline);
+  const nearest = offers
+    .filter(
+      (offer) =>
+        respectsSearchConstraints(offer, request) &&
+        Date.parse(offer.arrivalAt) > deadline,
+    )
+    .sort(
+      (left, right) =>
+        Date.parse(left.arrivalAt) - Date.parse(right.arrivalAt),
+    )[0];
+
+  if (!nearest) return undefined;
+
+  return {
+    ...nearest,
+    missedDeadlineByMinutes: Math.ceil(
+      (Date.parse(nearest.arrivalAt) - deadline) / 60_000,
+    ),
+  };
 }
 
 export function selectRescueOptions(
@@ -77,7 +115,7 @@ export function selectRescueOptions(
     request.preferences.priority,
     "fastest",
     "cheapest",
-    "fewest_transfers",
+    "fastest_within_budget",
   ].filter(
     (category, index, values): category is ResultCategory =>
       values.indexOf(category) === index,
