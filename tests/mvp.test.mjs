@@ -90,9 +90,10 @@ test("server-renders the Успеть product instead of the starter", async () 
 
   const html = await response.text();
   assert.match(html, /<title>Успеть/);
-  assert.match(html, /Успеть — значит/);
-  assert.match(html, /Найти маршрут/);
-  assert.doesNotMatch(html, /Что произошло и куда нужно успеть/);
+  assert.match(html, /Как успеть к нужному времени/);
+  assert.match(html, /Найти, как успеть/);
+  assert.match(html, /Где вы сейчас/);
+  assert.match(html, /Быть в городе не позже/);
   assert.doesNotMatch(html, /2026-08-19T09:00|2026-08-19T10:30/);
   assert.doesNotMatch(html, /Демо-данные|\bMVP\b|\bMCP\b/i);
   assert.doesNotMatch(html, /react-loading-skeleton|Your site is taking shape/);
@@ -129,6 +130,47 @@ test("does not invent an option when the deadline is impossible", async () => {
   assert.equal(response.status, 200);
   assert.deepEqual(body.options, []);
   assert.equal(body.rejectedCount, 4);
+  assert.equal(body.nearestAfterDeadline.id, "fixture-plane-fast");
+  assert.ok(body.nearestAfterDeadline.missedDeadlineByMinutes > 0);
+});
+
+test("returns one option when only one route meets the deadline", async () => {
+  const { response, body } = await search(
+    controlRequest({
+      destination: { arrivalDeadline: "2026-08-19T09:50:00.000Z" },
+    }),
+  );
+  assert.equal(response.status, 200);
+  assert.equal(body.options.length, 1);
+  assert.equal(body.options[0].id, "fixture-plane-fast");
+});
+
+test("keeps a small positive deadline margin explicit", async () => {
+  const { response, body } = await search(
+    controlRequest({
+      destination: { arrivalDeadline: "2026-08-19T08:55:00.000Z" },
+    }),
+  );
+  assert.equal(response.status, 200);
+  assert.equal(body.options.length, 1);
+  assert.equal(body.options[0].deadlineMarginMinutes, 5);
+});
+
+test("search does not require original-flight details", async () => {
+  const { response, body } = await search(
+    controlRequest({
+      incident: {
+        scheduledDeparture: undefined,
+        newDeparture: undefined,
+        expectedArrival: undefined,
+        flightNumber: undefined,
+        airlineId: undefined,
+        sellerId: undefined,
+      },
+    }),
+  );
+  assert.equal(response.status, 200);
+  assert.equal(body.options.length, 3);
 });
 
 test("strict origin excludes tickets from another station", async () => {

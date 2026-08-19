@@ -1,8 +1,13 @@
 import { getSupportBundle } from "../../../data/support-providers";
-import { rescueSearchRequestSchema, type SearchResponse } from "../../../lib/domain";
+import {
+  rescueSearchRequestSchema,
+  type SearchResponse,
+  type TravelOffer,
+} from "../../../lib/domain";
 import { getTravelProvider } from "../../../lib/providers";
 import {
   assessCurrentJourney,
+  findNearestAfterDeadline,
   filterOffers,
   selectRescueOptions,
 } from "../../../lib/search";
@@ -25,12 +30,21 @@ export async function POST(request: Request) {
   }
 
   const provider = getTravelProvider();
-  const offers = await provider.search(parsed.data);
+  let offers: TravelOffer[];
+  try {
+    offers = await provider.search(parsed.data);
+  } catch {
+    return Response.json(
+      { error: "Не удалось загрузить расписание. Попробуйте ещё раз." },
+      { status: 502 },
+    );
+  }
   const filteredOffers = filterOffers(offers, parsed.data);
   const options = selectRescueOptions(filteredOffers, parsed.data);
 
   const response: SearchResponse = {
     options,
+    nearestAfterDeadline: findNearestAfterDeadline(offers, parsed.data),
     rejectedCount: offers.length - filteredOffers.length,
     currentJourneyStatus: assessCurrentJourney(parsed.data),
     searchedAt: new Date().toISOString(),

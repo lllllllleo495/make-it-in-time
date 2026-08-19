@@ -20,7 +20,7 @@ export const rescueSearchRequestSchema = z
       }),
       currentTime: z.string().datetime(),
       disruptionType: z.enum(["cancelled", "delayed"]),
-      scheduledDeparture: z.string().datetime(),
+      scheduledDeparture: z.string().datetime().optional(),
       newDeparture: z.string().datetime().optional(),
       expectedArrival: z.string().datetime().optional(),
       flightNumber: z.string().max(16).optional(),
@@ -45,7 +45,6 @@ export const rescueSearchRequestSchema = z
   })
   .superRefine((request, context) => {
     const currentTime = Date.parse(request.incident.currentTime);
-    const scheduledDeparture = Date.parse(request.incident.scheduledDeparture);
     const readyFrom = Date.parse(request.departure.readyFrom);
     const deadline = Date.parse(request.destination.arrivalDeadline);
 
@@ -66,19 +65,10 @@ export const rescueSearchRequestSchema = z
     }
 
     if (
-      request.incident.disruptionType === "delayed" &&
-      !request.incident.newDeparture
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["incident", "newDeparture"],
-        message: "Укажите новое время отправления",
-      });
-    }
-
-    if (
       request.incident.newDeparture &&
-      Date.parse(request.incident.newDeparture) < scheduledDeparture
+      request.incident.scheduledDeparture &&
+      Date.parse(request.incident.newDeparture) <
+        Date.parse(request.incident.scheduledDeparture)
     ) {
       context.addIssue({
         code: "custom",
@@ -135,6 +125,10 @@ export type RescueOption = TravelOffer & {
   deadlineMarginMinutes: number;
 };
 
+export type MissedOption = TravelOffer & {
+  missedDeadlineByMinutes: number;
+};
+
 export type CurrentJourneyStatus = "fits" | "misses" | "unknown" | "cancelled";
 
 export type SupportContact = {
@@ -152,6 +146,7 @@ export type SupportContact = {
 
 export type SearchResponse = {
   options: RescueOption[];
+  nearestAfterDeadline?: MissedOption;
   rejectedCount: number;
   currentJourneyStatus: CurrentJourneyStatus;
   searchedAt: string;
