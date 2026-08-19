@@ -1,4 +1,8 @@
-import type { RescueSearchRequest, SupportContact } from "../lib/domain";
+import type {
+  RescueSearchRequest,
+  SupportContact,
+  SupportRequest,
+} from "../lib/domain";
 
 const contacts: SupportContact[] = [
   {
@@ -42,21 +46,33 @@ const contacts: SupportContact[] = [
   },
 ];
 
-export function getSupportBundle(request: RescueSearchRequest) {
+export function getSupportBundleForIds(request: SupportRequest) {
   const requestedIds = new Set([
-    request.incident.currentPlace.id,
-    request.incident.airlineId,
-    request.incident.sellerId,
+    request.currentPlaceId,
+    request.airlineId,
+    request.sellerId,
   ]);
   const selected = contacts.filter((contact) => requestedIds.has(contact.id));
 
   return {
     contacts: selected,
     actionPlan: [
-      "Проверьте актуальный статус исходного рейса на табло аэропорта.",
-      "Свяжитесь с авиакомпанией и уточните доступную замену рейса.",
+      request.disruptionType === "cancelled"
+        ? "Уточните у авиакомпании, на какой рейс вас могут пересадить."
+        : "Проверьте новое время вылета на табло аэропорта.",
+      "Свяжитесь с авиакомпанией и назовите номер рейса и бронирования.",
       "Если билет куплен через агрегатора, откройте заказ и запросите условия обмена или возврата.",
-      "Сравните ответ перевозчика с найденными вариантами и ещё раз проверьте наличие мест перед оформлением.",
+      "Перед покупкой нового билета ещё раз проверьте наличие мест и условия исходного билета.",
     ],
   };
+}
+
+export function getSupportBundle(request: RescueSearchRequest) {
+  return getSupportBundleForIds({
+    currentPlaceId: request.incident.currentPlace.id,
+    disruptionType: request.incident.disruptionType,
+    flightNumber: request.incident.flightNumber,
+    airlineId: request.incident.airlineId,
+    sellerId: request.incident.sellerId,
+  });
 }

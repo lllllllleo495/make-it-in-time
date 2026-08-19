@@ -90,10 +90,14 @@ test("server-renders the Успеть product instead of the starter", async () 
 
   const html = await response.text();
   assert.match(html, /<title>Успеть/);
-  assert.match(html, /Как успеть к нужному времени/);
-  assert.match(html, /Найти, как успеть/);
+  assert.match(html, /Куда нужно успеть/);
+  assert.match(html, /Продолжить/);
+  assert.match(html, /Все идет по плану/);
   assert.match(html, /Где вы сейчас/);
-  assert.match(html, /Быть в городе не позже/);
+  assert.match(html, /Куда нужно попасть/);
+  assert.match(html, /Быть на месте не позже/);
+  assert.doesNotMatch(html, /Когда готовы отправиться/);
+  assert.doesNotMatch(html, /Добраться вовремя после сбоя поездки/);
   assert.doesNotMatch(html, /2026-08-19T09:00|2026-08-19T10:30/);
   assert.doesNotMatch(html, /Демо-данные|\bMVP\b|\bMCP\b/i);
   assert.doesNotMatch(html, /react-loading-skeleton|Your site is taking shape/);
@@ -204,4 +208,26 @@ test("rejects search when ready time is not before the deadline", async () => {
   );
   assert.equal(response.status, 400);
   assert.match(body.issues[0].message, /Дедлайн/);
+});
+
+test("support is requested separately from route search", async () => {
+  const response = await request("/api/support", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      currentPlaceId: "pulkovo",
+      disruptionType: "cancelled",
+      airlineId: "aeroflot",
+      sellerId: "tutu",
+      flightNumber: "SU 15",
+    }),
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(
+    body.contacts.map((contact) => contact.type),
+    ["airline", "airport", "seller"],
+  );
+  assert.match(body.actionPlan[0], /пересадить/);
 });

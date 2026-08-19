@@ -37,6 +37,7 @@ export const rescueSearchRequestSchema = z
     }),
     preferences: z.object({
       passengers: z.number().int().min(1).max(9),
+      baggage: z.enum(["none", "carry_on", "checked"]).optional(),
       modes: z.array(transportModeSchema).min(1),
       priority: z.enum(["fastest", "cheapest", "fewest_transfers"]),
       maxPrice: z.number().positive().optional(),
@@ -92,6 +93,16 @@ export const rescueSearchRequestSchema = z
   });
 
 export type RescueSearchRequest = z.infer<typeof rescueSearchRequestSchema>;
+
+export const supportRequestSchema = z.object({
+  currentPlaceId: z.string().min(1),
+  disruptionType: z.enum(["cancelled", "delayed"]),
+  flightNumber: z.string().trim().max(16).optional(),
+  airlineId: z.string().optional(),
+  sellerId: z.string().optional(),
+});
+
+export type SupportRequest = z.infer<typeof supportRequestSchema>;
 
 export type TravelSegment = {
   mode: TransportMode;
