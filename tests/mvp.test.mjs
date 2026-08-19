@@ -30,7 +30,7 @@ async function request(path, init) {
   );
 }
 
-function demoRequest(overrides = {}) {
+function controlRequest(overrides = {}) {
   const request = {
     incident: {
       currentPlace: {
@@ -90,13 +90,16 @@ test("server-renders the Успеть product instead of the starter", async () 
 
   const html = await response.text();
   assert.match(html, /<title>Успеть/);
-  assert.match(html, /Сорвало рейс/);
-  assert.match(html, /Готов отправляться не раньше/);
+  assert.match(html, /Успеть — значит/);
+  assert.match(html, /Найти маршрут/);
+  assert.doesNotMatch(html, /Что произошло и куда нужно успеть/);
+  assert.doesNotMatch(html, /2026-08-19T09:00|2026-08-19T10:30/);
+  assert.doesNotMatch(html, /Демо-данные|\bMVP\b|\bMCP\b/i);
   assert.doesNotMatch(html, /react-loading-skeleton|Your site is taking shape/);
 });
 
 test("control case returns three unique options that meet the deadline", async () => {
-  const { response, body } = await search(demoRequest());
+  const { response, body } = await search(controlRequest());
   assert.equal(response.status, 200);
   assert.equal(body.dataSource, "fixture");
   assert.equal(body.currentJourneyStatus, "misses");
@@ -119,7 +122,7 @@ test("control case returns three unique options that meet the deadline", async (
 
 test("does not invent an option when the deadline is impossible", async () => {
   const { response, body } = await search(
-    demoRequest({
+    controlRequest({
       destination: { arrivalDeadline: "2026-08-19T06:30:00.000Z" },
     }),
   );
@@ -130,7 +133,7 @@ test("does not invent an option when the deadline is impossible", async () => {
 
 test("strict origin excludes tickets from another station", async () => {
   const { body } = await search(
-    demoRequest({ departure: { allowOtherPlaces: false } }),
+    controlRequest({ departure: { allowOtherPlaces: false } }),
   );
   assert.ok(body.options.length > 0);
   assert.ok(
@@ -142,7 +145,7 @@ test("strict origin excludes tickets from another station", async () => {
 
 test("current delayed flight is assessed separately when arrival is known", async () => {
   const { body } = await search(
-    demoRequest({
+    controlRequest({
       incident: {
         newDeparture: "2026-08-19T12:00:00.000Z",
         expectedArrival: "2026-08-19T14:00:00.000Z",
@@ -155,7 +158,7 @@ test("current delayed flight is assessed separately when arrival is known", asyn
 
 test("rejects search when ready time is not before the deadline", async () => {
   const { response, body } = await search(
-    demoRequest({ departure: { readyFrom: "2026-08-19T15:00:00.000Z" } }),
+    controlRequest({ departure: { readyFrom: "2026-08-19T15:00:00.000Z" } }),
   );
   assert.equal(response.status, 400);
   assert.match(body.issues[0].message, /Дедлайн/);
