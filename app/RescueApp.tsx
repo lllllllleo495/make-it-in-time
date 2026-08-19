@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, FormEvent, useEffect, useMemo, useState } from "react";
 import supportData from "../data/support-data.json";
 import type {
   RescueOption,
@@ -14,7 +14,7 @@ import type {
 type Screen = "route" | "preferences" | "results" | "support";
 type PlaceOption = RescueSearchRequest["incident"]["currentPlace"];
 type PlaceSearchOption = PlaceOption & { code: string; aliases: string[] };
-type Baggage = "none" | "carry_on" | "checked";
+type Baggage = "carry_on" | "checked";
 type FieldErrors = Partial<Record<keyof FormState, string>>;
 
 const PLACE_OPTIONS: PlaceSearchOption[] = supportData.airports.map((location) => ({
@@ -31,6 +31,7 @@ const SELLER_OPTIONS = supportData.sellers.map(({ id, name }) => ({ id, name }))
 const CITY_OPTIONS = Array.from(new Set(PLACE_OPTIONS.map((place) => place.city)));
 
 const ALL_MODES: TransportMode[] = ["plane", "train", "bus", "suburban"];
+const MIN_SEARCH_DURATION_MS = 1_950;
 
 const MODE_LABELS: Record<TransportMode, string> = {
   plane: "Самолёт",
@@ -147,12 +148,6 @@ function formatDay(value: string) {
     day: "numeric",
     month: "short",
   }).format(new Date(value));
-}
-
-function formatPassengerCount(value: number) {
-  if (value === 1) return "1 пассажир";
-  if (value >= 2 && value <= 4) return `${value} пассажира`;
-  return `${value} пассажиров`;
 }
 
 function formatPlaceLocation(place: PlaceOption) {
@@ -297,6 +292,7 @@ export function RescueApp() {
     }
     if (Object.keys(preferenceErrors).length) return;
 
+    const searchStartedAt = Date.now();
     setIsLoading(true);
     try {
       const response = await fetch("/api/search", {
@@ -307,6 +303,10 @@ export function RescueApp() {
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
         throw new Error(payload?.issues?.[0]?.message || payload?.error || "Не удалось загрузить варианты");
+      }
+      const waitTime = MIN_SEARCH_DURATION_MS - (Date.now() - searchStartedAt);
+      if (waitTime > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, waitTime));
       }
       setResult(payload as SearchResponse);
       setScreen("results");
@@ -480,8 +480,8 @@ function RouteScreen({
   return (
     <main className="flow-screen route-screen">
       <section className="page-heading">
-        <h1>Поможем успеть</h1>
-        <p>Укажите важное — детали уточним далее.</p>
+        <h1>Найдём способ<br />успеть</h1>
+        <p>Покажем только билеты, которые по расписанию прибывают до вашего дедлайна.</p>
       </section>
 
       <form id="route-form" className="panel route-form" onSubmit={onSubmit} noValidate>
@@ -500,18 +500,11 @@ function RouteScreen({
             }}
           />
 
-          <Field label="Куда нужно попасть" error={fieldErrors.destinationCity} htmlFor="destination">
-            <input
-              id="destination"
-              list="cities"
-              type="text"
-              placeholder="Например, Москва"
-              value={form.destinationCity}
-              aria-invalid={Boolean(fieldErrors.destinationCity)}
-              onChange={(event) => onField("destinationCity", event.target.value)}
-            />
-            <datalist id="cities">{CITY_OPTIONS.map((city) => <option value={city} key={city} />)}</datalist>
-          </Field>
+          <SearchableDestination
+            value={form.destinationCity}
+            error={fieldErrors.destinationCity}
+            onChange={(value) => onField("destinationCity", value)}
+          />
 
           <Field label="Быть на месте не позже" error={fieldErrors.arrivalDeadline} htmlFor="deadline">
             <input
@@ -525,7 +518,6 @@ function RouteScreen({
         </div>
 
         <div className="form-actions">
-          <span>Шаг 1 из 4</span>
           <button className="primary-button compact-button" type="submit">Продолжить</button>
         </div>
       </form>
@@ -610,6 +602,75 @@ function SearchablePlace({
   );
 }
 
+function SearchableDestination({
+  value,
+  error,
+  onChange,
+}: {
+  value: string;
+  error?: string;
+  onChange: (value: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const normalizedQuery = value.trim().toLocaleLowerCase("ru-RU");
+  const filtered = CITY_OPTIONS.filter((city) =>
+    !normalizedQuery || city.toLocaleLowerCase("ru-RU").includes(normalizedQuery),
+  ).slice(0, 7);
+
+  function choose(city: string) {
+    onChange(city);
+    setIsOpen(false);
+  }
+
+  return (
+    <div className="field place-combobox destination-combobox">
+      <label className="field-label" htmlFor="destination">Куда нужно попасть</label>
+      <input
+        id="destination"
+        type="text"
+        role="combobox"
+        autoComplete="off"
+        placeholder="Например, Москва"
+        value={value}
+        aria-expanded={isOpen}
+        aria-controls="destination-options"
+        aria-invalid={Boolean(error)}
+        onFocus={() => setIsOpen(true)}
+        onBlur={() => window.setTimeout(() => setIsOpen(false), 120)}
+        onChange={(event) => {
+          onChange(event.target.value);
+          setIsOpen(true);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && isOpen && filtered[0]) {
+            event.preventDefault();
+            choose(filtered[0]);
+          }
+        }}
+      />
+      {isOpen && filtered.length > 0 && (
+        <div className="place-options destination-options" id="destination-options" role="listbox">
+          {filtered.map((city) => (
+            <button
+              className={value === city ? "selected" : ""}
+              type="button"
+              role="option"
+              aria-selected={value === city}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => choose(city)}
+              key={city}
+            >
+              <span className="place-icon" aria-hidden="true">●</span>
+              <span><strong>{city}</strong><small>Город</small></span>
+            </button>
+          ))}
+        </div>
+      )}
+      <FieldError id="destination-error" message={error} />
+    </div>
+  );
+}
+
 function PreferencesScreen({
   form,
   place,
@@ -628,6 +689,19 @@ function PreferencesScreen({
   onBack: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  if (isLoading) {
+    return (
+      <main className="flow-screen preferences-screen searching-screen">
+        <section className="page-heading compact-heading searching-heading">
+          <h1>Ищем варианты</h1>
+          <p>Собираем билеты и сверяем их с вашим дедлайном.</p>
+        </section>
+        <TripSummary place={place} form={form} />
+        <SearchingState destination={form.destinationCity} modes={form.modes} />
+      </main>
+    );
+  }
+
   return (
     <main className="flow-screen preferences-screen">
       <button className="back-button" type="button" onClick={onBack}>← Изменить маршрут</button>
@@ -635,19 +709,18 @@ function PreferencesScreen({
         <h1>Что учесть?</h1>
         <p>Выберите подходящие условия — и найдём варианты.</p>
       </section>
-      <TripSummary place={place} form={form} onEdit={onBack} />
+      <TripSummary place={place} form={form} />
 
       <form id="preferences-form" className="panel preferences-form" onSubmit={onSubmit} noValidate>
         <div className="preference-grid">
           <div className="field baggage-field">
             <span className="field-label">Багаж</span>
-            <div className="segmented" role="radiogroup" aria-label="Багаж">
+            <div className="chip-group baggage-chip-group" role="radiogroup" aria-label="Багаж">
               {([
-                ["none", "Без багажа"],
                 ["carry_on", "Ручная кладь"],
                 ["checked", "С багажом"],
               ] as [Baggage, string][]).map(([value, label]) => (
-                <label className={form.baggage === value ? "active" : ""} key={value}>
+                <label className={form.baggage === value ? "chip active" : "chip"} key={value}>
                   <input type="radio" name="baggage" checked={form.baggage === value} onChange={() => onField("baggage", value)} />
                   {label}
                 </label>
@@ -659,15 +732,13 @@ function PreferencesScreen({
             <span className="field-label">Пассажиры</span>
             <div className="passenger-counter" role="group" aria-label="Количество пассажиров">
               <button type="button" aria-label="Уменьшить количество пассажиров" disabled={form.passengers <= 1} onClick={() => onField("passengers", form.passengers - 1)}>−</button>
-              <strong aria-live="polite">{formatPassengerCount(form.passengers)}</strong>
+              <strong aria-live="polite">{form.passengers}</strong>
               <button type="button" aria-label="Увеличить количество пассажиров" disabled={form.passengers >= 6} onClick={() => onField("passengers", form.passengers + 1)}>+</button>
             </div>
             <FieldError id="passengers-error" message={fieldErrors.passengers} />
           </div>
 
-          <Field label="Бюджет на всех" error={fieldErrors.maxPrice} htmlFor="budget">
-            <div className="input-suffix"><input id="budget" type="number" min="500" step="500" placeholder="Без ограничений" value={form.maxPrice} onChange={(event) => onField("maxPrice", event.target.value)} /><b>₽</b></div>
-          </Field>
+          <BudgetInput value={form.maxPrice} error={fieldErrors.maxPrice} onChange={(value) => onField("maxPrice", value)} />
 
           <div className="field transport-field">
             <span className="field-label">Транспорт</span>
@@ -693,6 +764,73 @@ function PreferencesScreen({
         </div>
       </form>
     </main>
+  );
+}
+
+function SearchingState({ destination, modes }: { destination: string; modes: TransportMode[] }) {
+  const [activeStep, setActiveStep] = useState(0);
+  const steps = [
+    "Ищем предложения на Туту",
+    "Сверяем время прибытия",
+    "Оставляем варианты до дедлайна",
+  ];
+  const shownModes = modes.length ? modes : ALL_MODES;
+
+  useEffect(() => {
+    const timers = [
+      window.setTimeout(() => setActiveStep(1), 650),
+      window.setTimeout(() => setActiveStep(2), 1_300),
+    ];
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, []);
+
+  return (
+    <section className="searching-card" aria-live="polite" aria-busy="true">
+      <div className="searching-copy">
+        <span className="searching-kicker">Поиск на Туту</span>
+        <h2>Сравниваем способы<br />Направление: {destination}</h2>
+        <p>{steps[activeStep]}</p>
+      </div>
+      <div className="searching-routes" aria-hidden="true">
+        {shownModes.map((mode, index) => (
+          <div className="searching-route" style={{ "--route-delay": `${index * 140}ms` } as CSSProperties} key={mode}>
+            <span>{MODE_ICONS[mode]}</span>
+            <i />
+          </div>
+        ))}
+      </div>
+      <div className="search-progress" aria-label={`${steps[activeStep]}, шаг ${activeStep + 1} из ${steps.length}`}>
+        <div className="search-progress-track"><i style={{ width: `${[30, 64, 92][activeStep]}%` }} /></div>
+        <small>{activeStep + 1} из {steps.length}</small>
+      </div>
+    </section>
+  );
+}
+
+function BudgetInput({ value, error, onChange }: { value: string; error?: string; onChange: (value: string) => void }) {
+  const [isFocused, setIsFocused] = useState(false);
+  const formatted = value
+    ? `${new Intl.NumberFormat("ru-RU").format(Number(value)).replace(/\s/g, " ")} ₽`
+    : "";
+
+  return (
+    <label className="field" htmlFor="budget">
+      <span className="field-label">Бюджет</span>
+      <input
+        id="budget"
+        className="budget-input"
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder="Без ограничений"
+        value={isFocused ? value : formatted}
+        aria-invalid={Boolean(error)}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        onChange={(event) => onChange(event.target.value.replace(/\D/g, "").slice(0, 9))}
+      />
+      <FieldError id="budget-error" message={error} />
+    </label>
   );
 }
 
@@ -764,8 +902,8 @@ function ResultsScreen({
 
       {response.options.length > 0 ? (
         <div className="result-list">
-          {response.options.map((option) => (
-            <ResultCard option={option} currentPlaceId={place.id} key={option.id} />
+          {response.options.map((option, index) => (
+            <ResultCard option={option} currentPlaceId={place.id} index={index} key={option.id} />
           ))}
         </div>
       ) : (
@@ -783,9 +921,11 @@ function ResultsScreen({
 function ResultCard({
   option,
   currentPlaceId,
+  index,
 }: {
   option: RescueOption;
   currentPlaceId: string;
+  index: number;
 }) {
   const smallMargin = option.deadlineMarginMinutes <= 60;
   const startsElsewhere = option.segments[0]?.fromPlaceId !== currentPlaceId;
@@ -793,7 +933,7 @@ function ResultCard({
     0,
     Math.round((Date.parse(option.arrivalAt) - Date.parse(option.departureAt)) / 60_000),
   );
-  const transport = Array.from(new Set(option.segments.map((segment) => `${MODE_ICONS[segment.mode]} ${MODE_LABELS[segment.mode]}`))).join(" + ");
+  const transport = Array.from(new Set(option.segments.map((segment) => MODE_LABELS[segment.mode]))).join(" + ");
   const route = option.segments.map((segment) => `${segment.fromStation} → ${segment.toStation}`).join(" · ");
   const operators = Array.from(new Set(option.segments.map((segment) =>
     [segment.vehicleName || segment.carrier, segment.voyageNumber].filter(Boolean).join(" "),
@@ -803,29 +943,38 @@ function ResultCard({
     option.luggageSummary,
     option.seatsLeft ? `Мест: ${option.seatsLeft}` : undefined,
   ].filter(Boolean).join(" · ");
+  const transferLabel = option.transferCount === 0
+    ? "Без пересадок"
+    : `${option.transferCount} ${option.transferCount === 1 ? "пересадка" : "пересадки"}`;
 
   return (
-    <article className={`result-card${smallMargin ? " result-card-risk" : ""}`}>
+    <article
+      className={`result-card${smallMargin ? " result-card-risk" : ""}`}
+      style={{ animationDelay: `${index * 110}ms` }}
+    >
       <div className="result-card-top">
+        <span className="result-transport-icon" aria-hidden="true">{MODE_ICONS[option.segments[0]?.mode ?? "plane"]}</span>
         <span className="result-category">{CATEGORY_LABELS[option.category]}</span>
         <span className="transport-label">{transport}</span>
+        <small className="result-operator">{operators}</small>
       </div>
 
       <div className="result-timeline">
         <div><time>{formatTime(option.departureAt)}</time><small>{formatDay(option.departureAt)}</small><span>{option.segments[0]?.fromStation}</span></div>
-        <div className="timeline-line"><span aria-label="Продолжительность пути">{formatDuration(travelDurationMinutes)}</span><i /></div>
+        <div className="timeline-line"><span aria-label="Продолжительность пути">{formatDuration(travelDurationMinutes)}</span><i /><b>{transferLabel}</b></div>
         <div><time>{formatTime(option.arrivalAt)}</time><small>{formatDay(option.arrivalAt)}</small><span>{option.segments.at(-1)?.toStation}</span></div>
       </div>
 
-      <p className="route-description"><strong>{operators}</strong>{route}</p>
-
-      <div className={`margin-block${smallMargin ? " margin-risk" : ""}`}>
-        <span aria-hidden="true">{smallMargin ? "!" : "✓"}</span>
-        <p>{smallMargin ? "Будете всего за" : "Будете за"}<strong>{formatDuration(option.deadlineMarginMinutes)}</strong><small>до дедлайна</small></p>
+      <div className="result-metrics">
+        <div><span>Прибытие</span><strong>{formatDateTime(option.arrivalAt)}</strong></div>
+        <div className={smallMargin ? "metric-risk" : ""}><span>Запас до дедлайна</span><strong>{formatDuration(option.deadlineMarginMinutes)}</strong></div>
       </div>
 
+      <p className="route-description">{route}</p>
+      {fareDetails && <p className="fare-copy">▣ {fareDetails}</p>}
+
       <div className="result-buy">
-        <div><span>{option.priceIsFrom ? "Цена от, за всех" : "Цена за всех"}</span><strong>{option.totalPrice > 0 ? formatMoney(option.totalPrice, option.currency) : "Уточняется"}</strong>{fareDetails && <small>{fareDetails}</small>}</div>
+        <div><span>{option.priceIsFrom ? "Цена от" : "Цена"}</span><strong>{option.totalPrice > 0 ? formatMoney(option.totalPrice, option.currency) : "Уточняется"}</strong></div>
         <TicketButton option={option} />
       </div>
 

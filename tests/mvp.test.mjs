@@ -90,7 +90,9 @@ test("server-renders the Успеть product instead of the starter", async () 
 
   const html = await response.text();
   assert.match(html, /<title>Успеть/);
-  assert.match(html, /Поможем успеть/);
+  assert.match(html, /Найдём способ/);
+  assert.match(html, /Покажем только билеты, которые по расписанию прибывают до вашего дедлайна/);
+  assert.doesNotMatch(html, /Шаг 1 из 4/);
   assert.match(html, /Продолжить/);
   assert.match(html, /Где вы сейчас/);
   assert.match(html, /Куда нужно попасть/);
