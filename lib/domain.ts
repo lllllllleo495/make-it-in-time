@@ -19,6 +19,7 @@ export const rescueSearchRequestSchema = z
         type: z.enum(["airport", "station"]),
       }),
       currentTime: z.string().datetime(),
+      timezoneOffsetMinutes: z.number().int().min(-840).max(840).optional(),
       disruptionType: z.enum(["cancelled", "delayed"]),
       scheduledDeparture: z.string().datetime().optional(),
       newDeparture: z.string().datetime().optional(),
@@ -36,7 +37,7 @@ export const rescueSearchRequestSchema = z
       allowOtherPlaces: z.boolean(),
     }),
     preferences: z.object({
-      passengers: z.number().int().min(1).max(9),
+      passengers: z.number().int().min(1).max(6),
       baggage: z.enum(["none", "carry_on", "checked"]).optional(),
       modes: z.array(transportModeSchema).min(1),
       priority: z.enum(["fastest", "cheapest", "fewest_transfers"]),
@@ -114,6 +115,8 @@ export type TravelSegment = {
   departureAt: string;
   arrivalAt: string;
   carrier: string;
+  voyageNumber?: string;
+  vehicleName?: string;
 };
 
 export type TravelOffer = {
@@ -123,9 +126,13 @@ export type TravelOffer = {
   departureAt: string;
   arrivalAt: string;
   totalPrice: number;
+  currency?: string;
+  priceIsFrom?: boolean;
   transferCount: number;
   seatsLeft?: number;
-  bookingUrl: string;
+  bookingUrl?: string;
+  fareName?: string;
+  luggageSummary?: string;
   source: "fixture" | "tutu-mcp";
 };
 

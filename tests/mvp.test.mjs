@@ -274,3 +274,109 @@ test("unknown support entity is reported without an invented link", async () => 
     { entityType: "airline", entityId: "unknown-airline" },
   ]);
 });
+
+test("Tutu MCP response is normalized into deadline-safe ticket cards", async () => {
+  const calls = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    if (String(input) !== "https://mock-mcp.test/mcp") {
+      return originalFetch(input, init);
+    }
+
+    const rpc = JSON.parse(String(init?.body));
+    calls.push(rpc);
+    const payload = {
+      variants: [
+        {
+            offer_id: "real-flight-1",
+            transport: "avia",
+            price: { amount: 5100, currency: "RUB" },
+            carriers: ["Аэрофлот"],
+            segments_count: 1,
+            departure_at: "2026-08-19T12:00:00+03:00",
+            arrival_at: "2026-08-19T13:30:00+03:00",
+            legs: [{
+              segments: [{
+                from: "Санкт-Петербург — Пулково (LED), терм. 1",
+                to: "Москва — Шереметьево (SVO), терм. B",
+                departure_at: "2026-08-19T12:00:00+03:00",
+                arrival_at: "2026-08-19T13:30:00+03:00",
+                carrier: "Аэрофлот",
+                voyage_no: "SU-15",
+              }],
+            }],
+            variants: [{
+              price: { amount: 5100, currency: "RUB" },
+              conditions: {
+                fare_family: "Эконом",
+                cabin_baggage: { kg: 10, pieces: 1 },
+              },
+            }],
+            search_results_url: "https://avia.tutu.ru/exact-search-url",
+        },
+        {
+            offer_id: "too-late-bus",
+            transport: "bus",
+            price: { amount: 1900, currency: "RUB" },
+            segments_count: 1,
+            departure_at: "2026-08-19T15:00:00+03:00",
+            arrival_at: "2026-08-19T20:00:00+03:00",
+            legs: [{
+              segments: [{
+                from: "Автовокзал Санкт-Петербург",
+                to: "Автовокзал Москва",
+                departure_at: "2026-08-19T15:00:00+03:00",
+                arrival_at: "2026-08-19T20:00:00+03:00",
+                carrier: "Перевозчик",
+              }],
+            }],
+            checkout_url: "https://mtp-deeplink.tutu.ru/exact-bus-url",
+        },
+      ],
+      meta: { has_more: false, unavailable: [] },
+    };
+
+    return Response.json({
+      jsonrpc: "2.0",
+      id: rpc.id,
+      result: {
+        isError: false,
+        content: [{ type: "text", text: JSON.stringify(payload) }],
+      },
+    });
+  };
+
+  const previousProvider = process.env.TRAVEL_PROVIDER;
+  const previousEndpoint = process.env.TUTU_MCP_URL;
+  process.env.TRAVEL_PROVIDER = "tutu-mcp";
+  process.env.TUTU_MCP_URL = "https://mock-mcp.test/mcp";
+
+  try {
+    const { response, body } = await search(controlRequest({
+      preferences: { baggage: "carry_on" },
+    }));
+
+    assert.equal(response.status, 200);
+    assert.equal(body.dataSource, "tutu-mcp");
+    assert.equal(body.options.length, 1);
+    assert.equal(body.options[0].source, "tutu-mcp");
+    assert.equal(body.options[0].totalPrice, 5100);
+    assert.equal(body.options[0].currency, "RUB");
+    assert.equal(body.options[0].bookingUrl, "https://avia.tutu.ru/exact-search-url");
+    assert.equal(body.options[0].segments[0].carrier, "Аэрофлот");
+    assert.equal(body.options[0].segments[0].voyageNumber, "SU-15");
+    assert.equal(body.options[0].luggageSummary, "Ручная кладь: 10 кг, 1 место");
+    assert.ok(Date.parse(body.options[0].arrivalAt) <= Date.parse("2026-08-19T15:00:00.000Z"));
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].params.name, "search_multitransport");
+    assert.deepEqual(calls[0].params.arguments.modes, ["avia", "railway", "bus"]);
+    assert.equal(calls[0].params.arguments.origin, "Санкт-Петербург");
+    assert.equal(calls[0].params.arguments.destination, "Москва");
+  } finally {
+    if (previousProvider === undefined) delete process.env.TRAVEL_PROVIDER;
+    else process.env.TRAVEL_PROVIDER = previousProvider;
+    if (previousEndpoint === undefined) delete process.env.TUTU_MCP_URL;
+    else process.env.TUTU_MCP_URL = previousEndpoint;
+    globalThis.fetch = originalFetch;
+  }
+});

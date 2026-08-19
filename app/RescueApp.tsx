@@ -128,8 +128,21 @@ function formatDuration(minutes: number) {
   return rest ? `${hours} ч ${rest} мин` : `${hours} ч`;
 }
 
-function formatMoney(value: number) {
-  return `${new Intl.NumberFormat("ru-RU").format(value)} ₽`;
+function formatMoney(value: number, currency = "RUB") {
+  const fractionDigits = Number.isInteger(value) ? 0 : 2;
+  return new Intl.NumberFormat("ru-RU", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(value);
+}
+
+function formatDay(value: string) {
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "short",
+  }).format(new Date(value));
 }
 
 function formatPassengerCount(value: number) {
@@ -173,8 +186,8 @@ function validateRoute(form: FormState) {
 
 function validatePreferences(form: FormState) {
   const errors: FieldErrors = {};
-  if (!Number.isInteger(form.passengers) || form.passengers < 1 || form.passengers > 9) {
-    errors.passengers = "От 1 до 9 пассажиров";
+  if (!Number.isInteger(form.passengers) || form.passengers < 1 || form.passengers > 6) {
+    errors.passengers = "От 1 до 6 пассажиров";
   }
   if (form.maxPrice && Number(form.maxPrice) < 500) {
     errors.maxPrice = "Минимальный бюджет — 500 ₽";
@@ -191,6 +204,7 @@ function buildRequest(form: FormState, place: PlaceOption): RescueSearchRequest 
     incident: {
       currentPlace: place,
       currentTime: now,
+      timezoneOffsetMinutes: new Date().getTimezoneOffset(),
       disruptionType: "delayed",
     },
     destination: {
@@ -639,7 +653,7 @@ function PreferencesScreen({
             <div className="passenger-counter" role="group" aria-label="Количество пассажиров">
               <button type="button" aria-label="Уменьшить количество пассажиров" disabled={form.passengers <= 1} onClick={() => onField("passengers", form.passengers - 1)}>−</button>
               <strong aria-live="polite">{formatPassengerCount(form.passengers)}</strong>
-              <button type="button" aria-label="Увеличить количество пассажиров" disabled={form.passengers >= 9} onClick={() => onField("passengers", form.passengers + 1)}>+</button>
+              <button type="button" aria-label="Увеличить количество пассажиров" disabled={form.passengers >= 6} onClick={() => onField("passengers", form.passengers + 1)}>+</button>
             </div>
             <FieldError id="passengers-error" message={fieldErrors.passengers} />
           </div>
@@ -773,21 +787,30 @@ function ResultCard({
   const startsElsewhere = option.segments[0]?.fromPlaceId !== currentPlaceId;
   const transport = Array.from(new Set(option.segments.map((segment) => MODE_LABELS[segment.mode]))).join(" + ");
   const route = option.segments.map((segment) => `${segment.fromStation} → ${segment.toStation}`).join(" · ");
+  const operators = Array.from(new Set(option.segments.map((segment) =>
+    [segment.vehicleName || segment.carrier, segment.voyageNumber].filter(Boolean).join(" "),
+  ))).join(" · ");
+  const fareDetails = [
+    option.fareName,
+    option.luggageSummary,
+    option.seatsLeft ? `Мест: ${option.seatsLeft}` : undefined,
+  ].filter(Boolean).join(" · ");
 
   return (
     <article className={`result-card${smallMargin ? " result-card-risk" : ""}`}>
       <div className="result-card-top">
         <span className="result-category">{CATEGORY_LABELS[option.category]}</span>
         <span className="transport-label">{transport}</span>
+        {option.source === "tutu-mcp" && <span className="source-label">Туту</span>}
       </div>
 
       <div className="result-timeline">
-        <div><time>{formatTime(option.departureAt)}</time><span>{option.segments[0]?.fromStation}</span></div>
+        <div><time>{formatTime(option.departureAt)}</time><small>{formatDay(option.departureAt)}</small><span>{option.segments[0]?.fromStation}</span></div>
         <div className="timeline-line"><span>{option.transferCount === 0 ? "Без пересадок" : `${option.transferCount} перес.`}</span><i /></div>
-        <div><time>{formatTime(option.arrivalAt)}</time><span>{option.segments.at(-1)?.toStation}</span></div>
+        <div><time>{formatTime(option.arrivalAt)}</time><small>{formatDay(option.arrivalAt)}</small><span>{option.segments.at(-1)?.toStation}</span></div>
       </div>
 
-      <p className="route-description">{route}</p>
+      <p className="route-description"><strong>{operators}</strong>{route}</p>
 
       <div className={`margin-block${smallMargin ? " margin-risk" : ""}`}>
         <span aria-hidden="true">{smallMargin ? "!" : "✓"}</span>
@@ -795,8 +818,12 @@ function ResultCard({
       </div>
 
       <div className="result-buy">
-        <div><span>Цена за всех</span><strong>{option.totalPrice > 0 ? formatMoney(option.totalPrice) : "Уточняется"}</strong>{option.seatsLeft ? <small>Мест: {option.seatsLeft}</small> : null}</div>
-        <a className={emphasized ? "primary-button ticket-button" : "secondary-button ticket-button"} href={option.bookingUrl} target="_blank" rel="noreferrer">Открыть билет</a>
+        <div><span>{option.priceIsFrom ? "Цена от, за всех" : "Цена за всех"}</span><strong>{option.totalPrice > 0 ? formatMoney(option.totalPrice, option.currency) : "Уточняется"}</strong>{fareDetails && <small>{fareDetails}</small>}</div>
+        {option.bookingUrl ? (
+          <a className={emphasized ? "primary-button ticket-button" : "secondary-button ticket-button"} href={option.bookingUrl} target="_blank" rel="noreferrer">Смотреть на Туту</a>
+        ) : (
+          <span className="ticket-unavailable">Ссылка недоступна</span>
+        )}
       </div>
 
       <div className="result-warnings">
