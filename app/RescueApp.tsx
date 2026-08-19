@@ -419,7 +419,6 @@ export function RescueApp() {
           supportError={supportError}
           isLoading={isSupportLoading}
           onField={setField}
-          onBack={toggleSupport}
           onSubmit={loadSupport}
         />
       )}
@@ -1055,7 +1054,6 @@ function SupportScreen({
   supportError,
   isLoading,
   onField,
-  onBack,
   onSubmit,
 }: {
   form: FormState;
@@ -1064,7 +1062,6 @@ function SupportScreen({
   supportError: string | null;
   isLoading: boolean;
   onField: <Key extends keyof FormState>(key: Key, value: FormState[Key]) => void;
-  onBack: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   useEffect(() => {
@@ -1073,7 +1070,6 @@ function SupportScreen({
 
   return (
     <main className="flow-screen support-screen">
-      <button className="back-button" type="button" onClick={onBack}>← Закрыть помощь</button>
       <section className="page-heading compact-heading">
         <h1>Помощь с рейсом</h1>
         <p>Укажите, где вы сейчас, авиакомпанию и продавца — соберём контакты и короткий план действий</p>
@@ -1119,16 +1115,14 @@ function SupportScreen({
             <div className="support-results-heading">
               <div><h2 id="support-actions-title">Ваш план действий</h2>{support.departureTime && <p>Исходный вылет: <strong>{support.departureTime}</strong></p>}</div>
             </div>
+            <div className="support-prep">
+              <strong>Подготовьте перед обращением</strong>
+              <p>Номер брони или заказа, ФИО пассажира, маршрут и дату, уведомление об отмене или переносе и желаемый вариант: обмен или возврат</p>
+            </div>
             {support.actions.length > 0 ? (
-              <>
-                <ol className="support-action-list">
-                  {support.actions.map((action, index) => <SupportActionItem action={action} number={index + 1} key={action.id} />)}
-                </ol>
-                <div className="support-prep">
-                  <strong>Подготовьте перед обращением</strong>
-                  <p>Номер брони или заказа, ФИО пассажира, маршрут и дату, уведомление об отмене или переносе и желаемый вариант: обмен или возврат</p>
-                </div>
-              </>
+              <ol className="support-action-list">
+                {support.actions.map((action, index) => <SupportActionItem action={action} number={index + 1} key={action.id} />)}
+              </ol>
             ) : (
               <div className="no-contacts"><p>Проверенных ссылок пока нет</p><span>Уточните авиакомпанию или обратитесь на стойку информации</span></div>
             )}
