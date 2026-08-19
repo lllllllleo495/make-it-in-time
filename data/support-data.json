@@ -9,6 +9,12 @@
         "main": "https://www.aeroflot.ru/ru-ru/help",
         "contact": "https://www.aeroflot.ru/ru-ru/help"
       },
+      "directContact": {
+        "type": "phone",
+        "value": "8 800 444-55-55",
+        "label": "Позвонить",
+        "href": "tel:+78004445555"
+      },
       "source": { "url": "https://www.aeroflot.ru/ru-ru/help", "verifiedAt": "2026-08-19" }
     },
     {
@@ -20,6 +26,12 @@
         "main": "https://www.flypobeda.ru/services",
         "flightStatus": "https://www.flypobeda.ru/services/online-board",
         "contact": "https://www.flypobeda.ru/information/contacts"
+      },
+      "directContact": {
+        "type": "phone",
+        "value": "8 809 505-67-77 · звонок платный",
+        "label": "Позвонить",
+        "href": "tel:+78095056777"
       },
       "source": { "url": "https://www.flypobeda.ru/information/contacts", "verifiedAt": "2026-08-19" }
     },
@@ -51,6 +63,12 @@
         "main": "https://nordwindairlines.ru/",
         "contact": "https://nordwindairlines.ru/ru/contacts"
       },
+      "directContact": {
+        "type": "phone",
+        "value": "+7 495 730-43-30",
+        "label": "Позвонить",
+        "href": "tel:+74957304330"
+      },
       "source": { "url": "https://nordwindairlines.ru/ru/contacts", "verifiedAt": "2026-08-19" }
     },
     {
@@ -76,6 +94,12 @@
         "orders": "https://www.tutu.ru/feedback.php",
         "contact": "https://www.tutu.ru/feedback.php"
       },
+      "directContact": {
+        "type": "web",
+        "value": "Форма поддержки Туту",
+        "label": "Написать",
+        "href": "https://www.tutu.ru/feedback.php"
+      },
       "source": { "url": "https://www.tutu.ru/feedback.php", "verifiedAt": "2026-08-19" }
     },
     {
@@ -83,8 +107,14 @@
       "type": "seller",
       "name": "Авиасейлс",
       "aliases": ["Aviasales", "Авиасейлс"],
-      "support": { "main": "https://www.aviasales.ru/faq?language=ru", "contact": "https://www.aviasales.ru/about/contacts" },
-      "source": { "url": "https://www.aviasales.ru/about/contacts", "verifiedAt": "2026-08-19" }
+      "support": { "main": "https://www.aviasales.ru/faq?language=ru", "contact": "https://www.aviasales.ru/faq/kak-vam-pozvonit" },
+      "directContact": {
+        "type": "web",
+        "value": "Горячей линии нет · форма поддержки",
+        "label": "Написать",
+        "href": "https://ota-m.aviasales.ru/go/help"
+      },
+      "source": { "url": "https://www.aviasales.ru/faq/kak-vam-pozvonit", "verifiedAt": "2026-08-19" }
     },
     {
       "id": "yandex-travel",
@@ -92,6 +122,12 @@
       "name": "Яндекс Путешествия",
       "aliases": ["Yandex Travel", "Яндекс Путешествия"],
       "support": { "main": "https://yandex.ru/support/travel/ru/troubleshooting", "contact": "https://yandex.ru/support/travel/ru/troubleshooting" },
+      "directContact": {
+        "type": "web",
+        "value": "Форма поддержки Яндекс Путешествий",
+        "label": "Написать",
+        "href": "https://yandex.ru/support/travel/ru/troubleshooting"
+      },
       "source": { "url": "https://yandex.ru/support/travel/ru/troubleshooting", "verifiedAt": "2026-08-19" }
     },
     {
@@ -100,6 +136,12 @@
       "name": "Ozon Travel",
       "aliases": ["Ozon", "Ozon Travel", "Озон"],
       "support": { "main": "https://www.ozon.ru/travel/mergeInitialisation/" },
+      "directContact": {
+        "type": "web",
+        "value": "Чат поддержки Ozon Travel",
+        "label": "Открыть чат",
+        "href": "https://www.ozon.ru/travel/mergeInitialisation/"
+      },
       "source": { "url": "https://www.ozon.ru/travel/mergeInitialisation/", "verifiedAt": "2026-08-19" }
     },
     {
@@ -108,6 +150,12 @@
       "name": "OneTwoTrip",
       "aliases": ["OneTwoTrip", "OTT"],
       "support": { "main": "https://support.onetwotrip.com/hc/", "contact": "https://support.onetwotrip.com/hc/" },
+      "directContact": {
+        "type": "web",
+        "value": "Центр поддержки OneTwoTrip",
+        "label": "Написать",
+        "href": "https://support.onetwotrip.com/hc/"
+      },
       "source": { "url": "https://support.onetwotrip.com/hc/", "verifiedAt": "2026-08-19" }
     }
   ],
@@ -120,7 +168,13 @@
       "code": "LED",
       "aliases": ["LED", "Пулково", "Pulkovo", "Санкт-Петербург"],
       "support": { "main": "https://pulkovoairport.ru/passengers/", "departures": "https://pulkovoairport.ru/passengers/" },
-      "source": { "url": "https://pulkovoairport.ru/passengers/", "verifiedAt": "2026-08-19" }
+      "directContact": {
+        "type": "phone",
+        "value": "+7 812 324-30-00 · круглосуточно",
+        "label": "Позвонить",
+        "href": "tel:+78123243000"
+      },
+      "source": { "url": "https://pulkovoairport.ru/about/contacts/", "verifiedAt": "2026-08-19" }
     },
     {
       "id": "sheremetyevo",

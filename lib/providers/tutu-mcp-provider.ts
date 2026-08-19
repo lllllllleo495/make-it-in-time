@@ -350,15 +350,25 @@ export function normalizeTutuOffer(
   const departureAt = offer.departure_at || segments[0]?.departureAt;
   const arrivalAt = offer.arrival_at || segments.at(-1)?.arrivalAt;
   const amount =
-    selectedFare?.price?.amount ?? offer.price?.amount ?? offer.fares?.price_from;
+    offer.price?.amount ?? offer.fares?.price_from ?? selectedFare?.price?.amount;
   if (!segments.length || !departureAt || !arrivalAt || typeof amount !== "number") {
     return undefined;
   }
 
   const currency =
-    selectedFare?.price?.currency || offer.price?.currency || offer.fares?.currency || "RUB";
+    offer.price?.currency || offer.fares?.currency || selectedFare?.price?.currency || "RUB";
   const bookingUrl = offer.checkout_url || offer.search_results_url;
   const transferCount = Math.max(0, (offer.segments_count ?? segments.length) - 1);
+  const selectedFareMatchesBase = selectedFare?.price?.amount === amount;
+  const luggageSummary = transport === "avia"
+    ? selectedFareMatchesBase
+      ? describeLuggage(selectedFare)
+      : request.preferences.baggage === "checked"
+        ? "Багаж не включён в цену от — добавьте на Туту"
+        : request.preferences.baggage === "carry_on"
+          ? "Ручная кладь не включена в цену от — уточните на Туту"
+          : undefined
+    : undefined;
   const title = transferCount
     ? `${MODE_TITLE[mode]} · ${transferCount} перес.`
     : MODE_TITLE[mode];
@@ -371,12 +381,12 @@ export function normalizeTutuOffer(
     arrivalAt,
     totalPrice: amount,
     currency,
-    priceIsFrom: transport === "railway",
+    priceIsFrom: transport === "avia" || transport === "railway",
     transferCount,
     seatsLeft: offer.seats_left,
     bookingUrl,
-    fareName: selectedFare?.conditions?.fare_family,
-    luggageSummary: transport === "avia" ? describeLuggage(selectedFare) : undefined,
+    fareName: selectedFareMatchesBase ? selectedFare?.conditions?.fare_family : undefined,
+    luggageSummary,
     source: "tutu-mcp",
   };
 }

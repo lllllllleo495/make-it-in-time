@@ -233,6 +233,9 @@ test("support returns intent-based actions in a deterministic order", async () =
   assert.equal(body.actions[0].url, "https://www.aeroflot.ru/ru-ru/help");
   assert.equal(body.actions[1].url, "https://www.tutu.ru/feedback.php");
   assert.equal(body.actions[2].url, "https://pulkovoairport.ru/passengers/");
+  assert.equal(body.actions[0].contactValue, "8 800 444-55-55");
+  assert.equal(body.actions[1].contactValue, "Форма поддержки Туту");
+  assert.equal(body.actions[2].contactValue, "+7 812 324-30-00 · круглосуточно");
 });
 
 test("support works without a seller and does not create an empty action", async () => {
@@ -251,6 +254,24 @@ test("support works without a seller and does not create an empty action", async
     body.actions.map((action) => action.category),
     ["flight_status", "location"],
   );
+});
+
+test("Aviasales support uses its official form instead of an invented hotline", async () => {
+  const response = await request("/api/support", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      currentPlaceId: "pulkovo",
+      sellerId: "aviasales",
+    }),
+  });
+  const body = await response.json();
+  const sellerAction = body.actions.find((action) => action.entityId === "aviasales");
+
+  assert.equal(response.status, 200);
+  assert.equal(sellerAction.contactType, "web");
+  assert.equal(sellerAction.contactValue, "Горячей линии нет · форма поддержки");
+  assert.equal(sellerAction.contactHref, "https://ota-m.aviasales.ru/go/help");
 });
 
 test("unknown support entity is reported without an invented link", async () => {
@@ -305,13 +326,22 @@ test("Tutu MCP response is normalized into deadline-safe ticket cards", async ()
                 voyage_no: "SU-15",
               }],
             }],
-            variants: [{
-              price: { amount: 5100, currency: "RUB" },
-              conditions: {
-                fare_family: "Эконом",
-                cabin_baggage: { kg: 10, pieces: 1 },
+            variants: [
+              {
+                price: { amount: 5100, currency: "RUB" },
+                conditions: {
+                  fare_family: "Эконом",
+                  cabin_baggage: { kg: 10, pieces: 1 },
+                },
               },
-            }],
+              {
+                price: { amount: 9592, currency: "RUB" },
+                conditions: {
+                  fare_family: "Эконом с багажом",
+                  baggage: { kg: 23, pieces: 1 },
+                },
+              },
+            ],
             search_results_url: "https://avia.tutu.ru/exact-search-url",
         },
         {
@@ -353,7 +383,7 @@ test("Tutu MCP response is normalized into deadline-safe ticket cards", async ()
 
   try {
     const { response, body } = await search(controlRequest({
-      preferences: { baggage: "carry_on" },
+      preferences: { baggage: "checked" },
     }));
 
     assert.equal(response.status, 200);
@@ -361,11 +391,13 @@ test("Tutu MCP response is normalized into deadline-safe ticket cards", async ()
     assert.equal(body.options.length, 1);
     assert.equal(body.options[0].source, "tutu-mcp");
     assert.equal(body.options[0].totalPrice, 5100);
+    assert.equal(body.options[0].priceIsFrom, true);
     assert.equal(body.options[0].currency, "RUB");
     assert.equal(body.options[0].bookingUrl, "https://avia.tutu.ru/exact-search-url");
     assert.equal(body.options[0].segments[0].carrier, "Аэрофлот");
     assert.equal(body.options[0].segments[0].voyageNumber, "SU-15");
-    assert.equal(body.options[0].luggageSummary, "Ручная кладь: 10 кг, 1 место");
+    assert.equal(body.options[0].fareName, undefined);
+    assert.equal(body.options[0].luggageSummary, "Багаж не включён в цену от — добавьте на Туту");
     assert.ok(Date.parse(body.options[0].arrivalAt) <= Date.parse("2026-08-19T15:00:00.000Z"));
     assert.equal(calls.length, 1);
     assert.equal(calls[0].params.name, "search_multitransport");

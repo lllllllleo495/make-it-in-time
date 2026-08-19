@@ -20,6 +20,12 @@ type DirectoryEntity = {
   id: string;
   name: string;
   support: SupportLinks;
+  directContact?: {
+    type: "phone" | "email" | "web";
+    value: string;
+    label: string;
+    href: string;
+  };
   source?: { url: string; verifiedAt: string };
 };
 
@@ -51,6 +57,23 @@ function airlineActionLabel(airline: DirectoryEntity) {
   return `Проверить у ${genitiveNames[airline.id] ?? airline.name}`;
 }
 
+function contactFields(entity: DirectoryEntity, fallbackUrl: string) {
+  if (entity.directContact) {
+    return {
+      contactType: entity.directContact.type,
+      contactValue: entity.directContact.value,
+      contactLabel: entity.directContact.label,
+      contactHref: entity.directContact.href,
+    } as const;
+  }
+  return {
+    contactType: "web" as const,
+    contactValue: `Официальная поддержка ${entity.name}`,
+    contactLabel: "Открыть",
+    contactHref: fallbackUrl,
+  };
+}
+
 export function getSupportActions(
   context: SupportRequest,
   data: SupportDirectory = directory,
@@ -69,10 +92,11 @@ export function getSupportActions(
         entityType: "airline",
         entityId: airline.id,
         entityName: airline.name,
-        title: "Проверить информацию о рейсе",
-        description: "Проверьте изменения у авиакомпании и при необходимости свяжитесь с перевозчиком.",
+        title: `Уточните статус у ${airline.name}`,
+        description: "Спросите об актуальном времени вылета и доступных вариантах пересадки.",
         actionLabel: airlineActionLabel(airline),
         url,
+        ...contactFields(airline, url),
         verifiedAt: airline.source?.verifiedAt,
       });
     } else {
@@ -91,10 +115,13 @@ export function getSupportActions(
         entityType: "seller",
         entityId: seller.id,
         entityName: seller.name,
-        title: "Разобраться с билетом",
-        description: `Билет оформлен через ${seller.name}. Обмен или возврат лучше уточнять у продавца.`,
+        title: `Запросите обмен или возврат у ${seller.name}`,
+        description: seller.id === "aviasales"
+          ? "Если билет куплен напрямую — откройте «Мои заказы». Если у партнёра — его контакты указаны в билете."
+          : `Билет оформлен через ${seller.name}, поэтому изменение заказа нужно согласовать с продавцом.`,
         actionLabel: `Открыть ${seller.name}`,
         url,
+        ...contactFields(seller, url),
         verifiedAt: seller.source?.verifiedAt,
       });
     } else {
@@ -113,10 +140,13 @@ export function getSupportActions(
       entityType: "location",
       entityId: location.id,
       entityName: location.name,
-      title: isAirport ? "Проверить ситуацию в аэропорту" : "Проверить ситуацию на вокзале",
-      description: `Посмотрите актуальную информацию для пассажиров в точке «${location.name}».`,
+      title: isAirport ? `Уточните ситуацию в ${location.name}` : `Уточните ситуацию на ${location.name}`,
+      description: isAirport
+        ? "Справочная подскажет актуальное табло и где найти стойку информации."
+        : "Справочная подскажет актуальное расписание и где получить помощь.",
       actionLabel: isAirport ? `Открыть табло ${location.name}` : `Открыть ${location.name}`,
       url: locationUrl,
+      ...contactFields(location, locationUrl),
       verifiedAt: location.source?.verifiedAt,
     });
   } else {

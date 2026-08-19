@@ -39,6 +39,13 @@ const MODE_LABELS: Record<TransportMode, string> = {
   suburban: "Электричка",
 };
 
+const MODE_ICONS: Record<TransportMode, string> = {
+  plane: "✈️",
+  train: "🚆",
+  bus: "🚌",
+  suburban: "🚊",
+};
+
 const CATEGORY_LABELS: Record<ResultCategory, string> = {
   fastest: "Больше всего запаса",
   cheapest: "Самый выгодный",
@@ -54,7 +61,6 @@ type FormState = {
   baggage: Baggage;
   modes: TransportMode[];
   maxPrice: string;
-  disruptionType: "cancelled" | "delayed";
   departureTime: string;
   airlineId: string;
   sellerId: string;
@@ -69,7 +75,6 @@ const EMPTY_FORM: FormState = {
   baggage: "carry_on",
   modes: ALL_MODES,
   maxPrice: "",
-  disruptionType: "delayed",
   departureTime: "",
   airlineId: "",
   sellerId: "",
@@ -86,7 +91,6 @@ const SEARCH_FIELDS = new Set<keyof FormState>([
   "maxPrice",
 ]);
 const SUPPORT_FIELDS = new Set<keyof FormState>([
-  "disruptionType",
   "departureTime",
   "airlineId",
   "sellerId",
@@ -323,7 +327,6 @@ export function RescueApp() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           currentPlaceId: place.id,
-          disruptionType: form.disruptionType,
           departureTime: form.departureTime || undefined,
           airlineId: form.airlineId || undefined,
           sellerId: form.sellerId || undefined,
@@ -752,14 +755,13 @@ function ResultsScreen({
       <TripSummary place={place} form={form} />
 
       <div className="results-heading">
-        <div><h1>{response.options.length ? "Вот как можно успеть" : "До дедлайна не успеем"}</h1>{response.options.length > 0 && <p>Показываем только билеты, которые прибывают вовремя.</p>}</div>
-        {response.options.length > 0 && <span>{response.options.length} {response.options.length === 1 ? "вариант" : "варианта"}</span>}
+        <div><h1>{response.options.length ? "Вот как можно успеть" : "До дедлайна не успеем"}</h1></div>
       </div>
 
       {response.options.length > 0 ? (
         <div className="result-list">
-          {response.options.map((option, index) => (
-            <ResultCard option={option} currentPlaceId={place.id} key={option.id} emphasized={index === 0} />
+          {response.options.map((option) => (
+            <ResultCard option={option} currentPlaceId={place.id} key={option.id} />
           ))}
         </div>
       ) : (
@@ -777,15 +779,13 @@ function ResultsScreen({
 function ResultCard({
   option,
   currentPlaceId,
-  emphasized,
 }: {
   option: RescueOption;
   currentPlaceId: string;
-  emphasized: boolean;
 }) {
   const smallMargin = option.deadlineMarginMinutes <= 60;
   const startsElsewhere = option.segments[0]?.fromPlaceId !== currentPlaceId;
-  const transport = Array.from(new Set(option.segments.map((segment) => MODE_LABELS[segment.mode]))).join(" + ");
+  const transport = Array.from(new Set(option.segments.map((segment) => `${MODE_ICONS[segment.mode]} ${MODE_LABELS[segment.mode]}`))).join(" + ");
   const route = option.segments.map((segment) => `${segment.fromStation} → ${segment.toStation}`).join(" · ");
   const operators = Array.from(new Set(option.segments.map((segment) =>
     [segment.vehicleName || segment.carrier, segment.voyageNumber].filter(Boolean).join(" "),
@@ -801,7 +801,6 @@ function ResultCard({
       <div className="result-card-top">
         <span className="result-category">{CATEGORY_LABELS[option.category]}</span>
         <span className="transport-label">{transport}</span>
-        {option.source === "tutu-mcp" && <span className="source-label">Туту</span>}
       </div>
 
       <div className="result-timeline">
@@ -820,7 +819,7 @@ function ResultCard({
       <div className="result-buy">
         <div><span>{option.priceIsFrom ? "Цена от, за всех" : "Цена за всех"}</span><strong>{option.totalPrice > 0 ? formatMoney(option.totalPrice, option.currency) : "Уточняется"}</strong>{fareDetails && <small>{fareDetails}</small>}</div>
         {option.bookingUrl ? (
-          <a className={emphasized ? "primary-button ticket-button" : "secondary-button ticket-button"} href={option.bookingUrl} target="_blank" rel="noreferrer">Смотреть на Туту</a>
+          <a className="primary-button ticket-button" href={option.bookingUrl} target="_blank" rel="noreferrer">Перейти</a>
         ) : (
           <span className="ticket-unavailable">Ссылка недоступна</span>
         )}
@@ -893,20 +892,12 @@ function SupportScreen({
     <main className="flow-screen support-screen">
       <button className="back-button" type="button" onClick={onBack}>← Вернуться к вариантам</button>
       <section className="page-heading compact-heading">
-        <h1>Что делать с исходным рейсом?</h1>
-        <p>Если что-то пошло не по плану, расскажите, что знаете. Покажем понятные действия и официальные ссылки.</p>
+        <h1>Рейс отменили или перенесли?</h1>
+        <p>Укажите авиакомпанию и продавца билета — соберём контакты и короткий план действий.</p>
       </section>
 
       <form className="panel support-form" onSubmit={onSubmit}>
         <div className="support-form-grid">
-          <div className="field support-wide">
-            <span className="field-label">Что случилось?</span>
-            <div className="segmented" role="radiogroup" aria-label="Что случилось с рейсом">
-              <label className={form.disruptionType === "delayed" ? "active" : ""}><input type="radio" name="disruption" checked={form.disruptionType === "delayed"} onChange={() => onField("disruptionType", "delayed")} />Рейс перенесли</label>
-              <label className={form.disruptionType === "cancelled" ? "active" : ""}><input type="radio" name="disruption" checked={form.disruptionType === "cancelled"} onChange={() => onField("disruptionType", "cancelled")} />Рейс отменили</label>
-            </div>
-          </div>
-
           <Field label="Авиакомпания" htmlFor="airline">
             <select id="airline" value={form.airlineId} onChange={(event) => onField("airlineId", event.target.value)}>
               <option value="">Не знаю</option>
@@ -927,8 +918,8 @@ function SupportScreen({
 
         {supportError && <div className="inline-error" role="alert">{supportError}</div>}
         <div className="form-actions support-actions">
-          <span>Можно не знать продавца и время — это не заблокирует помощь.</span>
-          <button className="primary-button compact-button" type="submit" disabled={isLoading}>{isLoading ? "Проверяем" : "Получить инструкцию"}</button>
+          <span>Не знаете продавца или время — всё равно покажем доступные контакты.</span>
+          <button className="primary-button compact-button" type="submit" disabled={isLoading}>{isLoading ? "Проверяем" : "Показать план"}</button>
         </div>
       </form>
 
@@ -936,13 +927,18 @@ function SupportScreen({
         <div className="support-results" aria-live="polite">
           <section className="support-actions-panel" aria-labelledby="support-actions-title">
             <div className="support-results-heading">
-              <div><h2 id="support-actions-title">Что сделать сейчас</h2>{support.departureTime && <p>Ваш исходный вылет: <strong>{support.departureTime}</strong></p>}</div>
-              <span>{support.actions.length} из 3 действий</span>
+              <div><h2 id="support-actions-title">Ваш план действий</h2>{support.departureTime && <p>Исходный вылет: <strong>{support.departureTime}</strong></p>}</div>
             </div>
             {support.actions.length > 0 ? (
-              <ol className="support-action-list">
-                {support.actions.map((action, index) => <SupportActionItem action={action} number={index + 1} key={action.id} />)}
-              </ol>
+              <>
+                <ol className="support-action-list">
+                  {support.actions.map((action, index) => <SupportActionItem action={action} number={index + 1} key={action.id} />)}
+                </ol>
+                <div className="support-prep">
+                  <strong>Подготовьте перед обращением</strong>
+                  <p>Номер брони или заказа, ФИО пассажира, маршрут и дату, уведомление об отмене или переносе и желаемый вариант: обмен или возврат.</p>
+                </div>
+              </>
             ) : (
               <div className="no-contacts"><p>Проверенных ссылок пока нет.</p><span>Уточните авиакомпанию или обратитесь на стойку информации.</span></div>
             )}
@@ -965,15 +961,14 @@ function SupportActionItem({ action, number }: { action: SupportAction; number: 
     <li className="support-action-item">
       <span className="support-action-number">{number}</span>
       <div className="support-action-copy">
-        <span>{action.entityName}</span>
         <h3>{action.title}</h3>
         <p>{action.description}</p>
-        {action.verifiedAt && <small>✓ Официальная ссылка</small>}
+        {action.contactValue && <strong className="support-contact-value">{action.contactValue}</strong>}
       </div>
       <a
-        className="secondary-button support-action-link"
-        href={action.url}
-        target="_blank"
+        className="primary-button support-action-link"
+        href={action.contactHref || action.url}
+        target={action.contactType === "phone" || action.contactType === "email" ? undefined : "_blank"}
         rel="noreferrer"
         onClick={() => trackSupportEvent("support_action_clicked", {
           action: action.category,
@@ -981,7 +976,7 @@ function SupportActionItem({ action, number }: { action: SupportAction; number: 
           entityId: action.entityId,
         })}
       >
-        {action.actionLabel}
+        {action.contactLabel || action.actionLabel}
       </a>
     </li>
   );

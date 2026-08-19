@@ -160,6 +160,10 @@ export type SupportAction = {
   description: string;
   actionLabel: string;
   url: string;
+  contactType?: "phone" | "email" | "web";
+  contactValue?: string;
+  contactLabel?: string;
+  contactHref?: string;
   verifiedAt?: string;
 };
 
