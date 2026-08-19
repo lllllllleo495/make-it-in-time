@@ -40,6 +40,8 @@ type TutuMoney = {
 
 type TutuFareVariant = {
   price?: TutuMoney;
+  offer_hash?: string | Record<string, unknown>;
+  service_class?: string | number;
   conditions?: {
     fare_family?: string;
     baggage?: { kg?: number | null; pieces?: number | null };
@@ -88,6 +90,7 @@ type TutuOffer = {
   seats_left?: number;
   checkout_url?: string;
   search_results_url?: string;
+  checkout_ref?: Record<string, unknown>;
 };
 
 type TutuSearchResponse = {
@@ -107,6 +110,13 @@ type McpToolResult = {
   isError?: boolean;
   structuredContent?: unknown;
   content?: Array<{ type?: string; text?: string }>;
+};
+
+type TutuCheckoutResponse = {
+  checkout_url?: string;
+  search_results_url?: string;
+  kind?: string;
+  fallback_note?: string;
 };
 
 function normalizeRailTransport(transport: TutuOffer["transport"]): TutuTransport | undefined {
@@ -349,14 +359,20 @@ export function normalizeTutuOffer(
   const segments = makeSegments(offer, mode, request);
   const departureAt = offer.departure_at || segments[0]?.departureAt;
   const arrivalAt = offer.arrival_at || segments.at(-1)?.arrivalAt;
+  const checkoutRef = offer.checkout_ref ? { ...offer.checkout_ref } : undefined;
+  if (checkoutRef && transport === "avia" && selectedFare?.offer_hash) {
+    checkoutRef.offer_hash = selectedFare.offer_hash;
+    if (selectedFare.service_class) checkoutRef.service_class = selectedFare.service_class;
+  }
+  const exactFare = checkoutRef && transport === "avia" ? selectedFare : undefined;
   const amount =
-    offer.price?.amount ?? offer.fares?.price_from ?? selectedFare?.price?.amount;
+    exactFare?.price?.amount ?? offer.price?.amount ?? offer.fares?.price_from ?? selectedFare?.price?.amount;
   if (!segments.length || !departureAt || !arrivalAt || typeof amount !== "number") {
     return undefined;
   }
 
   const currency =
-    offer.price?.currency || offer.fares?.currency || selectedFare?.price?.currency || "RUB";
+    exactFare?.price?.currency || offer.price?.currency || offer.fares?.currency || selectedFare?.price?.currency || "RUB";
   const bookingUrl = offer.checkout_url || offer.search_results_url;
   const transferCount = Math.max(0, (offer.segments_count ?? segments.length) - 1);
   const selectedFareMatchesBase = selectedFare?.price?.amount === amount;
@@ -381,13 +397,28 @@ export function normalizeTutuOffer(
     arrivalAt,
     totalPrice: amount,
     currency,
-    priceIsFrom: transport === "avia" || transport === "railway",
+    priceIsFrom: transport === "railway" || (transport === "avia" && !exactFare),
     transferCount,
     seatsLeft: offer.seats_left,
     bookingUrl,
+    checkoutRef,
     fareName: selectedFareMatchesBase ? selectedFare?.conditions?.fare_family : undefined,
     luggageSummary,
     source: "tutu-mcp",
+  };
+}
+
+export async function createTutuCheckoutLink(checkoutRef: Record<string, unknown>) {
+  const response = await new TutuMcpClient().callTool<TutuCheckoutResponse>(
+    "create_checkout_link",
+    checkoutRef,
+  );
+  const checkoutUrl = response.checkout_url || response.search_results_url;
+  if (!checkoutUrl) throw new Error("Tutu MCP не вернул ссылку для перехода");
+  return {
+    checkoutUrl,
+    kind: response.kind,
+    fallbackNote: response.fallback_note,
   };
 }
 

@@ -105,6 +105,12 @@ export const supportRequestSchema = z.object({
 
 export type SupportRequest = z.infer<typeof supportRequestSchema>;
 
+export const checkoutRequestSchema = z.object({
+  checkoutRef: z.record(z.string(), z.unknown()),
+});
+
+export type CheckoutRequest = z.infer<typeof checkoutRequestSchema>;
+
 export type TravelSegment = {
   mode: TransportMode;
   fromCity: string;
@@ -131,6 +137,7 @@ export type TravelOffer = {
   transferCount: number;
   seatsLeft?: number;
   bookingUrl?: string;
+  checkoutRef?: Record<string, unknown>;
   fareName?: string;
   luggageSummary?: string;
   source: "fixture" | "tutu-mcp";
@@ -160,10 +167,13 @@ export type SupportAction = {
   description: string;
   actionLabel: string;
   url: string;
-  contactType?: "phone" | "email" | "web";
-  contactValue?: string;
-  contactLabel?: string;
-  contactHref?: string;
+  contacts: Array<{
+    type: "phone" | "email";
+    label: string;
+    value: string;
+    href: string;
+  }>;
+  contactNote?: string;
   verifiedAt?: string;
 };
 

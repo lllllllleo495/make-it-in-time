@@ -17,12 +17,12 @@ type PlaceSearchOption = PlaceOption & { code: string; aliases: string[] };
 type Baggage = "none" | "carry_on" | "checked";
 type FieldErrors = Partial<Record<keyof FormState, string>>;
 
-const PLACE_OPTIONS: PlaceSearchOption[] = supportData.locations.map((location) => ({
+const PLACE_OPTIONS: PlaceSearchOption[] = supportData.airports.map((location) => ({
   id: location.id,
   name: location.name,
   city: location.city,
-  type: location.type === "airport" ? "airport" : "station",
-  code: location.code,
+  type: "airport",
+  code: location.iata,
   aliases: location.aliases,
 }));
 
@@ -153,6 +153,12 @@ function formatPassengerCount(value: number) {
   if (value === 1) return "1 пассажир";
   if (value >= 2 && value <= 4) return `${value} пассажира`;
   return `${value} пассажиров`;
+}
+
+function formatPlaceLocation(place: PlaceOption) {
+  const city = place.city.trim().toLocaleLowerCase("ru-RU");
+  const name = place.name.trim().toLocaleLowerCase("ru-RU");
+  return city === name ? place.name : `${place.city}, ${place.name}`;
 }
 
 function getPlace(form: FormState): PlaceOption | undefined {
@@ -577,9 +583,9 @@ function SearchablePlace({
           }
         }}
       />
-      {isOpen && (
+      {isOpen && filtered.length > 0 && (
         <div className="place-options" id="place-options" role="listbox">
-          {filtered.length > 0 ? filtered.map((option) => (
+          {filtered.map((option) => (
             <button
               className={selectedId === option.id ? "selected" : ""}
               type="button"
@@ -596,9 +602,7 @@ function SearchablePlace({
               <span><strong>{option.city}</strong><small>{option.name}</small></span>
               {option.code && <b>{option.code}</b>}
             </button>
-          )) : (
-            <p>Такой точки нет в справочнике. Можно продолжить со своим названием.</p>
-          )}
+          ))}
         </div>
       )}
       <FieldError id="place-search-error" message={error} />
@@ -785,6 +789,10 @@ function ResultCard({
 }) {
   const smallMargin = option.deadlineMarginMinutes <= 60;
   const startsElsewhere = option.segments[0]?.fromPlaceId !== currentPlaceId;
+  const travelDurationMinutes = Math.max(
+    0,
+    Math.round((Date.parse(option.arrivalAt) - Date.parse(option.departureAt)) / 60_000),
+  );
   const transport = Array.from(new Set(option.segments.map((segment) => `${MODE_ICONS[segment.mode]} ${MODE_LABELS[segment.mode]}`))).join(" + ");
   const route = option.segments.map((segment) => `${segment.fromStation} → ${segment.toStation}`).join(" · ");
   const operators = Array.from(new Set(option.segments.map((segment) =>
@@ -805,7 +813,7 @@ function ResultCard({
 
       <div className="result-timeline">
         <div><time>{formatTime(option.departureAt)}</time><small>{formatDay(option.departureAt)}</small><span>{option.segments[0]?.fromStation}</span></div>
-        <div className="timeline-line"><span>{option.transferCount === 0 ? "Без пересадок" : `${option.transferCount} перес.`}</span><i /></div>
+        <div className="timeline-line"><span aria-label="Продолжительность пути">{formatDuration(travelDurationMinutes)}</span><i /></div>
         <div><time>{formatTime(option.arrivalAt)}</time><small>{formatDay(option.arrivalAt)}</small><span>{option.segments.at(-1)?.toStation}</span></div>
       </div>
 
@@ -818,11 +826,7 @@ function ResultCard({
 
       <div className="result-buy">
         <div><span>{option.priceIsFrom ? "Цена от, за всех" : "Цена за всех"}</span><strong>{option.totalPrice > 0 ? formatMoney(option.totalPrice, option.currency) : "Уточняется"}</strong>{fareDetails && <small>{fareDetails}</small>}</div>
-        {option.bookingUrl ? (
-          <a className="primary-button ticket-button" href={option.bookingUrl} target="_blank" rel="noreferrer">Перейти</a>
-        ) : (
-          <span className="ticket-unavailable">Ссылка недоступна</span>
-        )}
+        <TicketButton option={option} />
       </div>
 
       <div className="result-warnings">
@@ -831,6 +835,49 @@ function ResultCard({
       </div>
     </article>
   );
+}
+
+function TicketButton({ option }: { option: RescueOption }) {
+  const [isOpening, setIsOpening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function openCheckout() {
+    if (!option.checkoutRef || isOpening) return;
+    setIsOpening(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ checkoutRef: option.checkoutRef }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.checkoutUrl) {
+        throw new Error(payload?.error || "Не удалось открыть билет");
+      }
+      window.location.assign(payload.checkoutUrl);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось открыть билет");
+      setIsOpening(false);
+    }
+  }
+
+  if (option.checkoutRef) {
+    return (
+      <div className="ticket-action">
+        <button className="primary-button ticket-button" type="button" onClick={openCheckout} disabled={isOpening}>
+          {isOpening ? "Переходим…" : "Перейти"}
+        </button>
+        {error && <small className="ticket-error" role="alert">{error}</small>}
+      </div>
+    );
+  }
+
+  if (option.bookingUrl) {
+    return <a className="primary-button ticket-button" href={option.bookingUrl} target="_blank" rel="noreferrer">Перейти</a>;
+  }
+
+  return <span className="ticket-unavailable">Ссылка недоступна</span>;
 }
 
 function EmptyState({
@@ -913,7 +960,7 @@ function SupportScreen({
           <Field label="Исходный вылет · необязательно" htmlFor="departure-time">
             <input id="departure-time" type="time" value={form.departureTime} onChange={(event) => onField("departureTime", event.target.value)} />
           </Field>
-          <div className="support-place"><span>Где вы сейчас</span><strong>{place.city}, {place.name}</strong></div>
+          <div className="support-place"><span>Где вы сейчас</span><strong>{formatPlaceLocation(place)}</strong></div>
         </div>
 
         {supportError && <div className="inline-error" role="alert">{supportError}</div>}
@@ -944,9 +991,6 @@ function SupportScreen({
             )}
           </section>
 
-          {support.misses.length > 0 && (
-            <div className="directory-miss">Для части данных пока нет проверенной ссылки — ничего не стали придумывать.</div>
-          )}
           {!form.sellerId && (
             <p className="seller-hint">Не помните продавца? Проверьте письмо с билетом или приложение, где оформляли заказ.</p>
           )}
@@ -963,12 +1007,21 @@ function SupportActionItem({ action, number }: { action: SupportAction; number: 
       <div className="support-action-copy">
         <h3>{action.title}</h3>
         <p>{action.description}</p>
-        {action.contactValue && <strong className="support-contact-value">{action.contactValue}</strong>}
+        {action.contacts.length > 0 && (
+          <div className="support-contact-list">
+            {action.contacts.map((contact) => (
+              <a href={contact.href} key={`${contact.type}-${contact.value}`}>
+                <span>{contact.label}</span>{contact.value}
+              </a>
+            ))}
+          </div>
+        )}
+        {action.contactNote && <small className="support-contact-note">{action.contactNote}</small>}
       </div>
       <a
         className="primary-button support-action-link"
-        href={action.contactHref || action.url}
-        target={action.contactType === "phone" || action.contactType === "email" ? undefined : "_blank"}
+        href={action.url}
+        target="_blank"
         rel="noreferrer"
         onClick={() => trackSupportEvent("support_action_clicked", {
           action: action.category,
@@ -976,7 +1029,7 @@ function SupportActionItem({ action, number }: { action: SupportAction; number: 
           entityId: action.entityId,
         })}
       >
-        {action.contactLabel || action.actionLabel}
+        {action.actionLabel}
       </a>
     </li>
   );

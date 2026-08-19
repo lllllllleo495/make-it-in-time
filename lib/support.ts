@@ -11,28 +11,31 @@ type SupportLinks = {
   flightStatus?: string;
   manageBooking?: string;
   contact?: string;
+  help?: string;
   orders?: string;
   refund?: string;
   departures?: string;
+  board?: string;
+  phone?: string | null;
+  phoneAlt?: string | null;
+  shortPhone?: string | null;
+  disruptionPhone?: string | null;
+  phoneNote?: string | null;
+  disruptionPhoneNote?: string | null;
+  email?: string | null;
 };
 
 type DirectoryEntity = {
   id: string;
   name: string;
   support: SupportLinks;
-  directContact?: {
-    type: "phone" | "email" | "web";
-    value: string;
-    label: string;
-    href: string;
-  };
   source?: { url: string; verifiedAt: string };
 };
 
 type SupportDirectory = {
   airlines: DirectoryEntity[];
   sellers: DirectoryEntity[];
-  locations: Array<DirectoryEntity & { type: string; city: string }>;
+  airports: Array<DirectoryEntity & { type: string; city: string }>;
 };
 
 const directory = supportData as SupportDirectory;
@@ -45,32 +48,36 @@ function firstUrl(entity: DirectoryEntity, keys: Array<keyof SupportLinks>) {
   return undefined;
 }
 
-function airlineActionLabel(airline: DirectoryEntity) {
-  const genitiveNames: Record<string, string> = {
-    aeroflot: "Аэрофлота",
-    pobeda: "Победы",
-    s7: "S7 Airlines",
-    ural: "Уральских авиалиний",
-    nordwind: "Nordwind Airlines",
-    rossiya: "авиакомпании «Россия»",
-  };
-  return `Проверить у ${genitiveNames[airline.id] ?? airline.name}`;
+function phoneHref(value: string) {
+  return `tel:${value.replace(/[^\d+*]/g, "")}`;
 }
 
-function contactFields(entity: DirectoryEntity, fallbackUrl: string) {
-  if (entity.directContact) {
-    return {
-      contactType: entity.directContact.type,
-      contactValue: entity.directContact.value,
-      contactLabel: entity.directContact.label,
-      contactHref: entity.directContact.href,
-    } as const;
+function contactFields(entity: DirectoryEntity) {
+  const contacts: SupportAction["contacts"] = [];
+  const addPhone = (value: string | null | undefined, label: string) => {
+    if (!value) return;
+    contacts.push({ type: "phone", label, value, href: phoneHref(value) });
+  };
+
+  addPhone(entity.support.phone, "Телефон");
+  addPhone(entity.support.phoneAlt, "Дополнительный");
+  addPhone(entity.support.shortPhone, "Короткий номер");
+  addPhone(entity.support.disruptionPhone, "При отмене или задержке");
+  if (entity.support.email) {
+    contacts.push({
+      type: "email",
+      label: "Почта",
+      value: entity.support.email,
+      href: `mailto:${entity.support.email}`,
+    });
   }
+
+  const contactNote = [entity.support.phoneNote, entity.support.disruptionPhoneNote]
+    .filter(Boolean)
+    .join(". ");
   return {
-    contactType: "web" as const,
-    contactValue: `Официальная поддержка ${entity.name}`,
-    contactLabel: "Открыть",
-    contactHref: fallbackUrl,
+    contacts,
+    contactNote: contactNote || undefined,
   };
 }
 
@@ -83,7 +90,7 @@ export function getSupportActions(
 
   if (context.airlineId) {
     const airline = data.airlines.find((item) => item.id === context.airlineId);
-    const url = airline && firstUrl(airline, ["flightStatus", "contact", "main"]);
+    const url = airline && firstUrl(airline, ["flightStatus", "contact", "help", "main"]);
     if (airline && url) {
       actions.push({
         id: `flight-status-${airline.id}`,
@@ -94,9 +101,9 @@ export function getSupportActions(
         entityName: airline.name,
         title: `Уточните статус у ${airline.name}`,
         description: "Спросите об актуальном времени вылета и доступных вариантах пересадки.",
-        actionLabel: airlineActionLabel(airline),
+        actionLabel: "Открыть сайт",
         url,
-        ...contactFields(airline, url),
+        ...contactFields(airline),
         verifiedAt: airline.source?.verifiedAt,
       });
     } else {
@@ -106,7 +113,7 @@ export function getSupportActions(
 
   if (context.sellerId) {
     const seller = data.sellers.find((item) => item.id === context.sellerId);
-    const url = seller && firstUrl(seller, ["orders", "refund", "contact", "main"]);
+    const url = seller && firstUrl(seller, ["orders", "refund", "contact", "help", "main"]);
     if (seller && url) {
       actions.push({
         id: `ticket-${seller.id}`,
@@ -119,9 +126,9 @@ export function getSupportActions(
         description: seller.id === "aviasales"
           ? "Если билет куплен напрямую — откройте «Мои заказы». Если у партнёра — его контакты указаны в билете."
           : `Билет оформлен через ${seller.name}, поэтому изменение заказа нужно согласовать с продавцом.`,
-        actionLabel: `Открыть ${seller.name}`,
+        actionLabel: "Открыть сайт",
         url,
-        ...contactFields(seller, url),
+        ...contactFields(seller),
         verifiedAt: seller.source?.verifiedAt,
       });
     } else {
@@ -129,8 +136,8 @@ export function getSupportActions(
     }
   }
 
-  const location = data.locations.find((item) => item.id === context.currentPlaceId);
-  const locationUrl = location && firstUrl(location, ["departures", "contact", "main"]);
+  const location = data.airports.find((item) => item.id === context.currentPlaceId);
+  const locationUrl = location && firstUrl(location, ["board", "departures", "contact", "main"]);
   if (location && locationUrl) {
     const isAirport = location.type === "airport";
     actions.push({
@@ -144,9 +151,9 @@ export function getSupportActions(
       description: isAirport
         ? "Справочная подскажет актуальное табло и где найти стойку информации."
         : "Справочная подскажет актуальное расписание и где получить помощь.",
-      actionLabel: isAirport ? `Открыть табло ${location.name}` : `Открыть ${location.name}`,
+      actionLabel: "Открыть сайт",
       url: locationUrl,
-      ...contactFields(location, locationUrl),
+      ...contactFields(location),
       verifiedAt: location.source?.verifiedAt,
     });
   } else {
