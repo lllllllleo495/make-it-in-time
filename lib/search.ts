@@ -20,6 +20,11 @@ const categorySorters: Record<
   fewest_transfers: (left, right) =>
     left.transferCount - right.transferCount ||
     Date.parse(left.arrivalAt) - Date.parse(right.arrivalAt),
+  fastest_within_budget: (left, right) =>
+    Date.parse(left.arrivalAt) - Date.parse(left.departureAt) -
+      (Date.parse(right.arrivalAt) - Date.parse(right.departureAt)) ||
+    Date.parse(left.arrivalAt) - Date.parse(right.arrivalAt) ||
+    left.totalPrice - right.totalPrice,
 };
 
 function offerKey(offer: TravelOffer) {
@@ -110,7 +115,7 @@ export function selectRescueOptions(
     request.preferences.priority,
     "fastest",
     "cheapest",
-    "fewest_transfers",
+    "fastest_within_budget",
   ].filter(
     (category, index, values): category is ResultCategory =>
       values.indexOf(category) === index,

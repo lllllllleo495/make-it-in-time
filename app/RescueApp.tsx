@@ -52,6 +52,7 @@ const CATEGORY_LABELS: Record<ResultCategory, string> = {
   fastest: "Больше всего запаса",
   cheapest: "Самый выгодный",
   fewest_transfers: "Меньше пересадок",
+  fastest_within_budget: "Самый быстрый под бюджет",
 };
 
 type FormState = {
@@ -999,12 +1000,54 @@ function ResultCard({
 }
 
 function TicketButton({ option }: { option: RescueOption }) {
+  const [isOpening, setIsOpening] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
   if (option.checkoutRef) {
+    const openCheckout = async () => {
+      setCheckoutError(null);
+      const checkoutWindow = window.open("about:blank", "_blank");
+      if (!checkoutWindow) {
+        setCheckoutError("Разрешите открытие новой вкладки");
+        return;
+      }
+
+      checkoutWindow.opener = null;
+      checkoutWindow.document.title = "Открываем Туту";
+      checkoutWindow.document.body.textContent = "Открываем билет на Туту…";
+      checkoutWindow.document.body.style.cssText = "margin:0;min-height:100vh;display:grid;place-items:center;font:600 18px system-ui;color:#14213d;background:#f5f7fb";
+      setIsOpening(true);
+
+      try {
+        const response = await fetch("/api/checkout", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ checkoutRef: option.checkoutRef }),
+        });
+        const payload = await response.json().catch(() => null) as { checkoutUrl?: string; error?: string } | null;
+        if (!response.ok || !payload?.checkoutUrl) {
+          throw new Error(payload?.error || "Не удалось получить ссылку на билет");
+        }
+        checkoutWindow.location.replace(payload.checkoutUrl);
+      } catch (error) {
+        if (option.bookingUrl) {
+          checkoutWindow.location.replace(option.bookingUrl);
+        } else {
+          checkoutWindow.close();
+          setCheckoutError(error instanceof Error ? error.message : "Не удалось открыть билет");
+        }
+      } finally {
+        setIsOpening(false);
+      }
+    };
+
     return (
-      <form className="ticket-action" action="/api/checkout" method="post" target="_blank" rel="noopener noreferrer">
-        <input type="hidden" name="checkoutRef" value={JSON.stringify(option.checkoutRef)} />
-        <button className="primary-button ticket-button" type="submit">Перейти</button>
-      </form>
+      <div className="ticket-action">
+        <button className="primary-button ticket-button" type="button" disabled={isOpening} onClick={openCheckout}>
+          {isOpening ? "Открываем" : "Перейти"}
+        </button>
+        {checkoutError && <small className="checkout-error" role="alert">{checkoutError}</small>}
+      </div>
     );
   }
 

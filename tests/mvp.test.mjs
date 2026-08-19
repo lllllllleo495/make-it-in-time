@@ -124,8 +124,9 @@ test("control case returns three unique options that meet the deadline", async (
 
   assert.deepEqual(
     body.options.map((option) => option.category),
-    ["fastest", "cheapest", "fewest_transfers"],
+    ["fastest", "cheapest", "fastest_within_budget"],
   );
+  assert.equal(body.options[2].id, "fixture-plane-value");
 });
 
 test("does not invent an option when the deadline is impossible", async () => {

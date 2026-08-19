@@ -143,7 +143,7 @@ export type TravelOffer = {
   source: "fixture" | "tutu-mcp";
 };
 
-export type ResultCategory = "fastest" | "cheapest" | "fewest_transfers";
+export type ResultCategory = "fastest" | "cheapest" | "fewest_transfers" | "fastest_within_budget";
 
 export type RescueOption = TravelOffer & {
   category: ResultCategory;

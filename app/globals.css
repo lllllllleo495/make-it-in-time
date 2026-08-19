@@ -493,6 +493,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .result-buy small { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
 .ticket-button { min-width: 155px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; font-size: 13px; }
 .ticket-action { display: flex; align-items: flex-end; flex-direction: column; gap: 5px; }
+.checkout-error { max-width: 210px; color: var(--red); font-size: 11px; line-height: 1.35; text-align: right; }
 .ticket-unavailable { min-width: 155px; min-height: 44px; display: grid; place-items: center; border-radius: 12px; color: var(--muted); background: var(--surface); font-size: 12px; font-weight: 750; }
 .result-warnings { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px 20px; }
 .result-warnings p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
