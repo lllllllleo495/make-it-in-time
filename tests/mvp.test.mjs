@@ -91,6 +91,8 @@ test("server-renders the Успеть product instead of the starter", async () 
   const html = await response.text();
   assert.match(html, /<title>Успеть/);
   assert.match(html, /Найдём способ/);
+  assert.match(html, /Помощь с рейсом/);
+  assert.doesNotMatch(html, />4<\/span>Помощь/);
   assert.match(html, /Покажем только билеты, которые по расписанию прибывают до вашего дедлайна/);
   assert.doesNotMatch(html, /Шаг 1 из 4/);
   assert.match(html, /Продолжить/);
@@ -458,6 +460,15 @@ test("Tutu MCP response is normalized into deadline-safe ticket cards", async ()
     assert.equal(calls.length, 2);
     assert.equal(calls[1].params.name, "create_checkout_link");
     assert.equal(calls[1].params.arguments.offer_hash, "checked-offer-hash");
+
+    const formCheckoutResponse = await request("/api/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ checkoutRef: JSON.stringify(body.options[0].checkoutRef) }),
+    });
+    assert.equal(formCheckoutResponse.status, 303);
+    assert.equal(formCheckoutResponse.headers.get("location"), "https://mtp-deeplink.tutu.ru/exact-flight-cart");
+    assert.equal(calls.length, 3);
   } finally {
     if (previousProvider === undefined) delete process.env.TRAVEL_PROVIDER;
     else process.env.TRAVEL_PROVIDER = previousProvider;

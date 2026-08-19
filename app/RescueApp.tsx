@@ -12,6 +12,7 @@ import type {
 } from "../lib/domain";
 
 type Screen = "route" | "preferences" | "results" | "support";
+type MainScreen = Exclude<Screen, "support">;
 type PlaceOption = RescueSearchRequest["incident"]["currentPlace"];
 type PlaceSearchOption = PlaceOption & { code: string; aliases: string[] };
 type Baggage = "carry_on" | "checked";
@@ -143,17 +144,15 @@ function formatMoney(value: number, currency = "RUB") {
   }).format(value);
 }
 
+function withoutTerminalPeriod(value: string) {
+  return value.trimEnd().replace(/\.$/u, "");
+}
+
 function formatDay(value: string) {
   return new Intl.DateTimeFormat("ru-RU", {
     day: "numeric",
     month: "short",
   }).format(new Date(value));
-}
-
-function formatPlaceLocation(place: PlaceOption) {
-  const city = place.city.trim().toLocaleLowerCase("ru-RU");
-  const name = place.name.trim().toLocaleLowerCase("ru-RU");
-  return city === name ? place.name : `${place.city}, ${place.name}`;
 }
 
 function getPlace(form: FormState): PlaceOption | undefined {
@@ -233,6 +232,7 @@ function buildRequest(form: FormState, place: PlaceOption): RescueSearchRequest 
 
 export function RescueApp() {
   const [screen, setScreen] = useState<Screen>("route");
+  const [returnScreen, setReturnScreen] = useState<MainScreen>("route");
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [result, setResult] = useState<SearchResponse | null>(null);
   const [support, setSupport] = useState<SearchResponse["support"] | null>(null);
@@ -309,7 +309,8 @@ export function RescueApp() {
         await new Promise((resolve) => window.setTimeout(resolve, waitTime));
       }
       setResult(payload as SearchResponse);
-      setScreen("results");
+      setReturnScreen((current) => current === "preferences" ? "results" : current);
+      setScreen((current) => current === "preferences" ? "results" : current);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "";
       setSearchError(
@@ -324,7 +325,11 @@ export function RescueApp() {
 
   async function loadSupport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!place || isSupportLoading) return;
+    if (isSupportLoading) return;
+    if (!place) {
+      setSupportError("Укажите, где вы сейчас");
+      return;
+    }
     setSupportError(null);
     setIsSupportLoading(true);
     try {
@@ -359,10 +364,19 @@ export function RescueApp() {
     setScreen(next);
   };
 
+  function toggleSupport() {
+    if (screen === "support") {
+      setScreen(returnScreen);
+      return;
+    }
+    setReturnScreen(screen);
+    setScreen("support");
+  }
+
   return (
     <div className="app-shell">
       <AppHeader
-        screen={screen}
+        screen={screen === "support" ? returnScreen : screen}
         canOpenPreferences={Boolean(place && form.destinationCity.trim() && form.arrivalDeadline)}
         hasResults={Boolean(result)}
         onNavigate={goTo}
@@ -398,11 +412,10 @@ export function RescueApp() {
           place={place}
           onEditRoute={() => setScreen("route")}
           onEditPreferences={() => setScreen("preferences")}
-          onSupport={() => setScreen("support")}
         />
       )}
 
-      {screen === "support" && place && (
+      {screen === "support" && (
         <SupportScreen
           form={form}
           place={place}
@@ -410,10 +423,20 @@ export function RescueApp() {
           supportError={supportError}
           isLoading={isSupportLoading}
           onField={setField}
-          onBack={() => setScreen(result ? "results" : "route")}
+          onBack={toggleSupport}
           onSubmit={loadSupport}
         />
       )}
+
+      <button
+        className={`support-launcher${screen === "support" ? " active" : ""}`}
+        type="button"
+        aria-label={screen === "support" ? "Закрыть помощь" : "Открыть помощь с рейсом"}
+        onClick={toggleSupport}
+      >
+        <span aria-hidden="true">{screen === "support" ? "×" : "?"}</span>
+        {screen === "support" ? "Закрыть" : "Помощь с рейсом"}
+      </button>
     </div>
   );
 }
@@ -433,7 +456,6 @@ function AppHeader({
     { id: "route", label: "Маршрут" },
     { id: "preferences", label: "Детали" },
     { id: "results", label: "Варианты" },
-    { id: "support", label: "Помощь" },
   ];
   const currentIndex = steps.findIndex((step) => step.id === screen);
 
@@ -446,7 +468,7 @@ function AppHeader({
         </button>
         <nav className="step-nav" aria-label="Этапы">
           {steps.map((step, index) => {
-            const canOpen = step.id === "route" || (step.id === "preferences" && canOpenPreferences) || (step.id === "results" && hasResults) || (step.id === "support" && hasResults);
+            const canOpen = step.id === "route" || (step.id === "preferences" && canOpenPreferences) || (step.id === "results" && hasResults);
             return (
               <button
                 className={`${screen === step.id ? "active " : ""}${index < currentIndex ? "done" : ""}`.trim()}
@@ -480,8 +502,8 @@ function RouteScreen({
   return (
     <main className="flow-screen route-screen">
       <section className="page-heading">
-        <h1>Найдём способ<br />успеть</h1>
-        <p>Покажем только билеты, которые по расписанию прибывают до вашего дедлайна.</p>
+        <h1>Найдём способ <span>успеть</span></h1>
+        <p>Покажем только билеты, которые по расписанию прибывают до вашего дедлайна</p>
       </section>
 
       <form id="route-form" className="panel route-form" onSubmit={onSubmit} noValidate>
@@ -694,7 +716,7 @@ function PreferencesScreen({
       <main className="flow-screen preferences-screen searching-screen">
         <section className="page-heading compact-heading searching-heading">
           <h1>Ищем варианты</h1>
-          <p>Собираем билеты и сверяем их с вашим дедлайном.</p>
+          <p>Собираем билеты и сверяем их с вашим дедлайном</p>
         </section>
         <TripSummary place={place} form={form} />
         <SearchingState destination={form.destinationCity} modes={form.modes} />
@@ -707,7 +729,7 @@ function PreferencesScreen({
       <button className="back-button" type="button" onClick={onBack}>← Изменить маршрут</button>
       <section className="page-heading compact-heading">
         <h1>Что учесть?</h1>
-        <p>Выберите подходящие условия — и найдём варианты.</p>
+        <p>Выберите подходящие условия — и найдём варианты</p>
       </section>
       <TripSummary place={place} form={form} />
 
@@ -800,7 +822,7 @@ function SearchingState({ destination, modes }: { destination: string; modes: Tr
         ))}
       </div>
       <div className="search-progress" aria-label={`${steps[activeStep]}, шаг ${activeStep + 1} из ${steps.length}`}>
-        <div className="search-progress-track"><i style={{ width: `${[30, 64, 92][activeStep]}%` }} /></div>
+        <div className="search-progress-track"><i style={{ width: `${[34, 68, 100][activeStep]}%` }} /></div>
         <small>{activeStep + 1} из {steps.length}</small>
       </div>
     </section>
@@ -810,25 +832,28 @@ function SearchingState({ destination, modes }: { destination: string; modes: Tr
 function BudgetInput({ value, error, onChange }: { value: string; error?: string; onChange: (value: string) => void }) {
   const [isFocused, setIsFocused] = useState(false);
   const formatted = value
-    ? `${new Intl.NumberFormat("ru-RU").format(Number(value)).replace(/\s/g, " ")} ₽`
+    ? new Intl.NumberFormat("ru-RU").format(Number(value)).replace(/\s/g, " ")
     : "";
 
   return (
-    <label className="field" htmlFor="budget">
+    <label className="field budget-field" htmlFor="budget">
       <span className="field-label">Бюджет</span>
-      <input
-        id="budget"
-        className="budget-input"
-        type="text"
-        inputMode="numeric"
-        autoComplete="off"
-        placeholder="Без ограничений"
-        value={isFocused ? value : formatted}
-        aria-invalid={Boolean(error)}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        onChange={(event) => onChange(event.target.value.replace(/\D/g, "").slice(0, 9))}
-      />
+      <div className="budget-control">
+        <input
+          id="budget"
+          className="budget-input"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="Без ограничений"
+          value={isFocused ? value : formatted}
+          aria-invalid={Boolean(error)}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          onChange={(event) => onChange(event.target.value.replace(/\D/g, "").slice(0, 9))}
+        />
+        <span aria-hidden="true">₽</span>
+      </div>
       <FieldError id="budget-error" message={error} />
     </label>
   );
@@ -879,14 +904,12 @@ function ResultsScreen({
   place,
   onEditRoute,
   onEditPreferences,
-  onSupport,
 }: {
   response: SearchResponse;
   form: FormState;
   place: PlaceOption;
   onEditRoute: () => void;
   onEditPreferences: () => void;
-  onSupport: () => void;
 }) {
   return (
     <main className="flow-screen results-screen">
@@ -897,7 +920,7 @@ function ResultsScreen({
       <TripSummary place={place} form={form} />
 
       <div className="results-heading">
-        <div><h1>{response.options.length ? "Вот как можно успеть" : "До дедлайна не успеем"}</h1></div>
+        <div><h1>{response.options.length ? "Вы успеваете" : "До дедлайна не успеем"}</h1></div>
       </div>
 
       {response.options.length > 0 ? (
@@ -909,11 +932,6 @@ function ResultsScreen({
       ) : (
         <EmptyState response={response} form={form} place={place} onEdit={onEditPreferences} />
       )}
-
-      <section className="support-prompt">
-        <div><span aria-hidden="true">?</span><p><strong>Рейс отменили или перенесли?</strong>Подскажем, кому позвонить и что сделать дальше.</p></div>
-        <button type="button" onClick={onSupport}>Получить помощь</button>
-      </section>
     </main>
   );
 }
@@ -979,51 +997,27 @@ function ResultCard({
       </div>
 
       <div className="result-warnings">
-        {startsElsewhere && <p><strong>Отправление из другой точки:</strong> {option.segments[0]?.fromStation}. Дорога до неё не учтена.</p>}
-        <p>Перед покупкой проверьте расписание и наличие мест.</p>
+        {startsElsewhere && <p><strong>Отправление из другой точки:</strong> {option.segments[0]?.fromStation}. Дорога до неё не учтена</p>}
+        <p>Перед покупкой проверьте расписание и наличие мест</p>
       </div>
     </article>
   );
 }
 
 function TicketButton({ option }: { option: RescueOption }) {
-  const [isOpening, setIsOpening] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function openCheckout() {
-    if (!option.checkoutRef || isOpening) return;
-    setIsOpening(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ checkoutRef: option.checkoutRef }),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload?.checkoutUrl) {
-        throw new Error(payload?.error || "Не удалось открыть билет");
-      }
-      window.location.assign(payload.checkoutUrl);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Не удалось открыть билет");
-      setIsOpening(false);
-    }
-  }
-
   if (option.checkoutRef) {
     return (
-      <div className="ticket-action">
-        <button className="primary-button ticket-button" type="button" onClick={openCheckout} disabled={isOpening}>
-          {isOpening ? "Переходим…" : "Перейти"}
+      <form className="ticket-action" action="/api/checkout" method="post" target="_blank" rel="noopener noreferrer">
+        <input type="hidden" name="checkoutRef" value={JSON.stringify(option.checkoutRef)} />
+        <button className="primary-button ticket-button" type="submit">
+          Перейти <span aria-hidden="true">↗</span>
         </button>
-        {error && <small className="ticket-error" role="alert">{error}</small>}
-      </div>
+      </form>
     );
   }
 
   if (option.bookingUrl) {
-    return <a className="primary-button ticket-button" href={option.bookingUrl} target="_blank" rel="noreferrer">Перейти</a>;
+    return <a className="primary-button ticket-button" href={option.bookingUrl} target="_blank" rel="noreferrer">Перейти <span aria-hidden="true">↗</span></a>;
   }
 
   return <span className="ticket-unavailable">Ссылка недоступна</span>;
@@ -1045,7 +1039,7 @@ function EmptyState({
       <div className="empty-main">
         <span className="empty-icon" aria-hidden="true">×</span>
         <h2>Успеть не получится</h2>
-        <p>Не нашли билетов из точки «{place.name}» в город «{form.destinationCity}» до {formatDateTime(form.arrivalDeadline)}.</p>
+        <p>Не нашли билетов из точки «{place.name}» в город «{form.destinationCity}» до {formatDateTime(form.arrivalDeadline)}</p>
         <button className="secondary-button" type="button" onClick={onEdit}>Изменить параметры</button>
       </div>
 
@@ -1072,7 +1066,7 @@ function SupportScreen({
   onSubmit,
 }: {
   form: FormState;
-  place: PlaceOption;
+  place?: PlaceOption;
   support: SearchResponse["support"] | null;
   supportError: string | null;
   isLoading: boolean;
@@ -1081,19 +1075,31 @@ function SupportScreen({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   useEffect(() => {
-    trackSupportEvent("support_block_viewed", { locationId: place.id });
-  }, [place.id]);
+    if (place) trackSupportEvent("support_block_viewed", { locationId: place.id });
+  }, [place]);
 
   return (
     <main className="flow-screen support-screen">
-      <button className="back-button" type="button" onClick={onBack}>← Вернуться к вариантам</button>
+      <button className="back-button" type="button" onClick={onBack}>← Закрыть помощь</button>
       <section className="page-heading compact-heading">
-        <h1>Рейс отменили или перенесли?</h1>
-        <p>Укажите авиакомпанию и продавца билета — соберём контакты и короткий план действий.</p>
+        <h1>Помощь с рейсом</h1>
+        <p>Укажите, где вы сейчас, авиакомпанию и продавца — соберём контакты и короткий план действий</p>
       </section>
 
       <form className="panel support-form" onSubmit={onSubmit}>
         <div className="support-form-grid">
+          <SearchablePlace
+            value={form.placeQuery}
+            selectedId={form.placeId}
+            onQueryChange={(value) => {
+              onField("placeQuery", value);
+              onField("placeId", "");
+            }}
+            onSelect={(option) => {
+              onField("placeId", option.id);
+              onField("placeQuery", `${option.city}, ${option.name}`);
+            }}
+          />
           <Field label="Авиакомпания" htmlFor="airline">
             <select id="airline" value={form.airlineId} onChange={(event) => onField("airlineId", event.target.value)}>
               <option value="">Не знаю</option>
@@ -1109,12 +1115,11 @@ function SupportScreen({
           <Field label="Исходный вылет · необязательно" htmlFor="departure-time">
             <input id="departure-time" type="time" value={form.departureTime} onChange={(event) => onField("departureTime", event.target.value)} />
           </Field>
-          <div className="support-place"><span>Где вы сейчас</span><strong>{formatPlaceLocation(place)}</strong></div>
         </div>
 
         {supportError && <div className="inline-error" role="alert">{supportError}</div>}
         <div className="form-actions support-actions">
-          <span>Не знаете продавца или время — всё равно покажем доступные контакты.</span>
+          <span>Не знаете продавца или время — всё равно покажем доступные контакты</span>
           <button className="primary-button compact-button" type="submit" disabled={isLoading}>{isLoading ? "Проверяем" : "Показать план"}</button>
         </div>
       </form>
@@ -1132,16 +1137,16 @@ function SupportScreen({
                 </ol>
                 <div className="support-prep">
                   <strong>Подготовьте перед обращением</strong>
-                  <p>Номер брони или заказа, ФИО пассажира, маршрут и дату, уведомление об отмене или переносе и желаемый вариант: обмен или возврат.</p>
+                  <p>Номер брони или заказа, ФИО пассажира, маршрут и дату, уведомление об отмене или переносе и желаемый вариант: обмен или возврат</p>
                 </div>
               </>
             ) : (
-              <div className="no-contacts"><p>Проверенных ссылок пока нет.</p><span>Уточните авиакомпанию или обратитесь на стойку информации.</span></div>
+              <div className="no-contacts"><p>Проверенных ссылок пока нет</p><span>Уточните авиакомпанию или обратитесь на стойку информации</span></div>
             )}
           </section>
 
           {!form.sellerId && (
-            <p className="seller-hint">Не помните продавца? Проверьте письмо с билетом или приложение, где оформляли заказ.</p>
+            <p className="seller-hint">Не помните продавца? Проверьте письмо с билетом или приложение, где оформляли заказ</p>
           )}
         </div>
       )}
@@ -1155,7 +1160,7 @@ function SupportActionItem({ action, number }: { action: SupportAction; number: 
       <span className="support-action-number">{number}</span>
       <div className="support-action-copy">
         <h3>{action.title}</h3>
-        <p>{action.description}</p>
+        <p>{withoutTerminalPeriod(action.description)}</p>
         {action.contacts.length > 0 && (
           <div className="support-contact-list">
             {action.contacts.map((contact) => (
@@ -1165,7 +1170,7 @@ function SupportActionItem({ action, number }: { action: SupportAction; number: 
             ))}
           </div>
         )}
-        {action.contactNote && <small className="support-contact-note">{action.contactNote}</small>}
+        {action.contactNote && <small className="support-contact-note">{withoutTerminalPeriod(action.contactNote)}</small>}
       </div>
       <a
         className="primary-button support-action-link"
