@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { RescueApp } from "./RescueApp";
+import { MinimalRescueApp } from "./MinimalRescueApp";
 
 export const metadata: Metadata = {
   title: "Успеть — экстренный поиск маршрута",
@@ -20,5 +20,5 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
-  return <RescueApp />;
+  return <MinimalRescueApp />;
 }

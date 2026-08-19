@@ -1,6 +1,7 @@
 import { getSupportBundle } from "../../../data/support-providers";
 import { rescueSearchRequestSchema, type SearchResponse } from "../../../lib/domain";
 import { getTravelProvider } from "../../../lib/providers";
+import { TutuMcpError } from "../../../lib/providers/tutu-mcp-client";
 import {
   assessCurrentJourney,
   filterOffers,
@@ -25,7 +26,24 @@ export async function POST(request: Request) {
   }
 
   const provider = getTravelProvider();
-  const offers = await provider.search(parsed.data);
+  let offers;
+
+  try {
+    offers = await provider.search(parsed.data);
+  } catch (error) {
+    if (error instanceof TutuMcpError) {
+      return Response.json(
+        {
+          error: "Источник Туту временно недоступен",
+          detail: error.message,
+        },
+        { status: 502 },
+      );
+    }
+
+    throw error;
+  }
+
   const filteredOffers = filterOffers(offers, parsed.data);
   const options = selectRescueOptions(filteredOffers, parsed.data);
 

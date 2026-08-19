@@ -77,7 +77,9 @@ export function selectRescueOptions(
     request.preferences.priority,
     "fastest",
     "cheapest",
-    "fewest_transfers",
+    ...(new Set(uniqueOffers.map((offer) => offer.transferCount)).size > 1
+      ? ["fewest_transfers" as const]
+      : []),
   ].filter(
     (category, index, values): category is ResultCategory =>
       values.indexOf(category) === index,
@@ -114,21 +116,7 @@ export function assessCurrentJourney(
   request: RescueSearchRequest,
 ): CurrentJourneyStatus {
   if (request.incident.disruptionType === "cancelled") return "cancelled";
-
-  const deadline = Date.parse(request.destination.arrivalDeadline);
-
-  if (request.incident.expectedArrival) {
-    return Date.parse(request.incident.expectedArrival) <= deadline
-      ? "fits"
-      : "misses";
-  }
-
-  if (
-    request.incident.newDeparture &&
-    Date.parse(request.incident.newDeparture) >= deadline
-  ) {
-    return "misses";
-  }
-
+  // Время нового вылета не позволяет честно прогнозировать прибытие:
+  // продолжительность, пересадки и задержки нам неизвестны.
   return "unknown";
 }

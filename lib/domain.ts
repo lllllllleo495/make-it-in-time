@@ -18,14 +18,8 @@ export const rescueSearchRequestSchema = z
         city: z.string().min(1),
         type: z.enum(["airport", "station"]),
       }),
-      currentTime: z.string().datetime(),
       disruptionType: z.enum(["cancelled", "delayed"]),
-      scheduledDeparture: z.string().datetime(),
       newDeparture: z.string().datetime().optional(),
-      expectedArrival: z.string().datetime().optional(),
-      flightNumber: z.string().max(16).optional(),
-      airlineId: z.string().optional(),
-      sellerId: z.string().optional(),
     }),
     destination: z.object({
       city: z.string().min(1),
@@ -44,18 +38,8 @@ export const rescueSearchRequestSchema = z
     }),
   })
   .superRefine((request, context) => {
-    const currentTime = Date.parse(request.incident.currentTime);
-    const scheduledDeparture = Date.parse(request.incident.scheduledDeparture);
     const readyFrom = Date.parse(request.departure.readyFrom);
     const deadline = Date.parse(request.destination.arrivalDeadline);
-
-    if (readyFrom < currentTime) {
-      context.addIssue({
-        code: "custom",
-        path: ["departure", "readyFrom"],
-        message: "Время готовности не может быть раньше текущего времени",
-      });
-    }
 
     if (readyFrom >= deadline) {
       context.addIssue({
@@ -76,29 +60,6 @@ export const rescueSearchRequestSchema = z
       });
     }
 
-    if (
-      request.incident.newDeparture &&
-      Date.parse(request.incident.newDeparture) < scheduledDeparture
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["incident", "newDeparture"],
-        message: "Новое время вылета не может быть раньше исходного",
-      });
-    }
-
-    if (
-      request.incident.expectedArrival &&
-      request.incident.newDeparture &&
-      Date.parse(request.incident.expectedArrival) <
-        Date.parse(request.incident.newDeparture)
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["incident", "expectedArrival"],
-        message: "Время прибытия должно быть позже нового времени вылета",
-      });
-    }
   });
 
 export type RescueSearchRequest = z.infer<typeof rescueSearchRequestSchema>;
@@ -113,6 +74,7 @@ export type TravelSegment = {
   departureAt: string;
   arrivalAt: string;
   carrier: string;
+  voyageNumber?: string;
 };
 
 export type TravelOffer = {
@@ -125,6 +87,9 @@ export type TravelOffer = {
   transferCount: number;
   seatsLeft?: number;
   bookingUrl: string;
+  searchResultsUrl?: string;
+  checkoutRef?: Record<string, unknown>;
+  baggageDescription?: string;
   source: "fixture" | "tutu-mcp";
 };
 
