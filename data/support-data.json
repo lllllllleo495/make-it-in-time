@@ -1,0 +1,1245 @@
+{
+  "meta": {
+    "version": 1,
+    "country": "RU",
+    "verifiedAt": "2026-08-19",
+    "purpose": "MVP directory for disruption support: delayed/cancelled/rescheduled flights",
+    "coverage": {
+      "airports": 32,
+      "airlines": 16,
+      "sellers": 9,
+      "note": "High-coverage seed for common Russian passenger flows. It is designed to approach ~95% of typical support cases, but this is not a statistically proven 95% market-share figure. Validate coverage with support_directory_miss telemetry."
+    },
+    "rules": {
+      "officialSourcesOnly": true,
+      "unknownPhone": null,
+      "doNotGuessMissingContacts": true,
+      "suggestedPriority": [
+        "airline",
+        "seller",
+        "airport"
+      ]
+    }
+  },
+  "airports": [
+    {
+      "id": "svo",
+      "iata": "SVO",
+      "type": "airport",
+      "name": "Шереметьево",
+      "city": "Москва",
+      "aliases": [
+        "Шереметьево",
+        "Sheremetyevo",
+        "SVO"
+      ],
+      "support": {
+        "board": "https://www.svo.aero/ru/timetable",
+        "phone": "+7 (495) 578-65-65",
+        "main": "https://www.svo.aero/"
+      },
+      "source": {
+        "url": "https://www.svo.aero/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "led",
+      "iata": "LED",
+      "type": "airport",
+      "name": "Пулково",
+      "city": "Санкт-Петербург",
+      "aliases": [
+        "Пулково",
+        "Pulkovo",
+        "LED"
+      ],
+      "support": {
+        "board": "https://pulkovoairport.ru/passengers/departure/",
+        "phone": "+7 (812) 324-30-00",
+        "main": "https://pulkovoairport.ru/"
+      },
+      "source": {
+        "url": "https://pulkovoairport.ru/passengers/departure/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "vko",
+      "iata": "VKO",
+      "type": "airport",
+      "name": "Внуково",
+      "city": "Москва",
+      "aliases": [
+        "Внуково",
+        "Vnukovo",
+        "VKO"
+      ],
+      "support": {
+        "board": "https://www.vnukovo.ru/ru/for-passengers/reysi/online-tablo/?bound=departure",
+        "phone": "+7 (495) 937-55-55",
+        "main": "https://www.vnukovo.ru/"
+      },
+      "source": {
+        "url": "https://www.vnukovo.ru/ru/for-passengers/reysi/online-tablo/?bound=departure",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "dme",
+      "iata": "DME",
+      "type": "airport",
+      "name": "Домодедово",
+      "city": "Москва",
+      "aliases": [
+        "Домодедово",
+        "Domodedovo",
+        "DME"
+      ],
+      "support": {
+        "board": "https://dme.ru/book/live-board/",
+        "phone": "+7 (495) 933-66-66",
+        "main": "https://dme.ru/"
+      },
+      "source": {
+        "url": "https://dme.ru/book/live-board/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "aer",
+      "iata": "AER",
+      "type": "airport",
+      "name": "Международный аэропорт Сочи",
+      "city": "Сочи",
+      "aliases": [
+        "Сочи",
+        "Адлер",
+        "Sochi",
+        "AER"
+      ],
+      "support": {
+        "board": "https://www.aeraero.ru/flights/online-schedule/",
+        "phone": "8 (800) 301-19-91",
+        "main": "https://www.aeraero.ru/"
+      },
+      "source": {
+        "url": "https://www.aeraero.ru/flights/online-schedule/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "ovb",
+      "iata": "OVB",
+      "type": "airport",
+      "name": "Толмачёво",
+      "city": "Новосибирск",
+      "aliases": [
+        "Толмачёво",
+        "Толмачево",
+        "Tolmachevo",
+        "Новосибирск",
+        "OVB"
+      ],
+      "support": {
+        "board": "https://tolmachevo.ru/passengers/information/timetable/",
+        "phone": "+7 (383) 216-99-99",
+        "main": "https://tolmachevo.ru/"
+      },
+      "source": {
+        "url": "https://tolmachevo.ru/passengers/information/timetable/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "svx",
+      "iata": "SVX",
+      "type": "airport",
+      "name": "Кольцово",
+      "city": "Екатеринбург",
+      "aliases": [
+        "Кольцово",
+        "Koltsovo",
+        "Екатеринбург",
+        "SVX"
+      ],
+      "support": {
+        "board": "https://svx.aero/board/",
+        "phone": "+7 (343) 226-85-82",
+        "main": "https://svx.aero/"
+      },
+      "source": {
+        "url": "https://svx.aero/board/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "kzn",
+      "iata": "KZN",
+      "type": "airport",
+      "name": "Международный аэропорт Казань",
+      "city": "Казань",
+      "aliases": [
+        "Казань",
+        "Kazan",
+        "KZN"
+      ],
+      "support": {
+        "board": "https://kazan.aero/on-line-schedule/",
+        "phone": "+7 (843) 267-88-07",
+        "main": "https://kazan.aero/"
+      },
+      "source": {
+        "url": "https://kazan.aero/on-line-schedule/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "mrv",
+      "iata": "MRV",
+      "type": "airport",
+      "name": "Минеральные Воды",
+      "city": "Минеральные Воды",
+      "aliases": [
+        "Минеральные Воды",
+        "Mineralnye Vody",
+        "MRV"
+      ],
+      "support": {
+        "board": "https://mvairport.ru/passengers/information/timetable/",
+        "phone": "+7 (87922) 51-577",
+        "main": "https://mvairport.ru/"
+      },
+      "source": {
+        "url": "https://mvairport.ru/passengers/information/timetable/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "kgd",
+      "iata": "KGD",
+      "type": "airport",
+      "name": "Храброво",
+      "city": "Калининград",
+      "aliases": [
+        "Храброво",
+        "Khrabrovo",
+        "Калининград",
+        "KGD"
+      ],
+      "support": {
+        "board": "https://kgdavia.ru/passengers/information/timetable/",
+        "phone": "+7 (4012) 550-550",
+        "main": "https://kgdavia.ru/"
+      },
+      "source": {
+        "url": "https://kgdavia.ru/passengers/information/timetable/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "ufa",
+      "iata": "UFA",
+      "type": "airport",
+      "name": "Международный аэропорт Уфа",
+      "city": "Уфа",
+      "aliases": [
+        "Уфа",
+        "Ufa",
+        "UFA"
+      ],
+      "support": {
+        "board": "https://www.airportufa.ru/scoreboard/",
+        "phone": "+7 (347) 229-55-00",
+        "main": "https://www.airportufa.ru/"
+      },
+      "source": {
+        "url": "https://www.airportufa.ru/scoreboard/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "kja",
+      "iata": "KJA",
+      "type": "airport",
+      "name": "Красноярск",
+      "city": "Красноярск",
+      "aliases": [
+        "Красноярск",
+        "Емельяново",
+        "Krasnoyarsk",
+        "KJA"
+      ],
+      "support": {
+        "board": "https://www.kja.aero/page-online-tablo/",
+        "phone": "+7 (391) 226-62-22",
+        "main": "https://www.kja.aero/"
+      },
+      "source": {
+        "url": "https://www.kja.aero/page-online-tablo/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "ikt",
+      "iata": "IKT",
+      "type": "airport",
+      "name": "Международный аэропорт Иркутск",
+      "city": "Иркутск",
+      "aliases": [
+        "Иркутск",
+        "Irkutsk",
+        "IKT"
+      ],
+      "support": {
+        "board": "https://iktport.ru/ru/passengers/shortdates-ru",
+        "phone": "+7 (3952) 507-277",
+        "main": "https://iktport.ru/"
+      },
+      "source": {
+        "url": "https://iktport.ru/ru/passengers/shortdates-ru",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "kuf",
+      "iata": "KUF",
+      "type": "airport",
+      "name": "Курумоч",
+      "city": "Самара",
+      "aliases": [
+        "Курумоч",
+        "Kurumoch",
+        "Самара",
+        "KUF"
+      ],
+      "support": {
+        "board": "https://ar-kuf.ru/board/",
+        "phone": "+7 (846) 966-50-55",
+        "main": "https://ar-kuf.ru/"
+      },
+      "source": {
+        "url": "https://ar-kuf.ru/board/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "vvo",
+      "iata": "VVO",
+      "type": "airport",
+      "name": "Владивосток (Кневичи)",
+      "city": "Владивосток",
+      "aliases": [
+        "Владивосток",
+        "Кневичи",
+        "Vladivostok",
+        "VVO"
+      ],
+      "support": {
+        "board": "https://aerovlad.ru/timetable",
+        "phone": "+7 (423) 230-69-09",
+        "main": "https://aerovlad.ru/"
+      },
+      "source": {
+        "url": "https://aerovlad.ru/timetable",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "mcx",
+      "iata": "MCX",
+      "type": "airport",
+      "name": "Махачкала (Уйташ)",
+      "city": "Махачкала",
+      "aliases": [
+        "Махачкала",
+        "Уйташ",
+        "Makhachkala",
+        "MCX"
+      ],
+      "support": {
+        "board": "https://mcx.aero/board/",
+        "phone": "+7 (8722) 55-55-00",
+        "main": "https://mcx.aero/"
+      },
+      "source": {
+        "url": "https://mcx.aero/board/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "tjm",
+      "iata": "TJM",
+      "type": "airport",
+      "name": "Рощино",
+      "city": "Тюмень",
+      "aliases": [
+        "Рощино",
+        "Тюмень",
+        "Tyumen",
+        "TJM"
+      ],
+      "support": {
+        "board": "https://tjmport.ru/passengers/information/timetable/",
+        "phone": "+7 (3452) 200-510",
+        "main": "https://tjmport.ru/"
+      },
+      "source": {
+        "url": "https://tjmport.ru/passengers/information/timetable/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "khv",
+      "iata": "KHV",
+      "type": "airport",
+      "name": "Хабаровск (Новый)",
+      "city": "Хабаровск",
+      "aliases": [
+        "Хабаровск",
+        "Новый",
+        "Khabarovsk",
+        "KHV"
+      ],
+      "support": {
+        "board": "https://khv.aero/online/",
+        "phone": "+7 (4212) 26-20-06",
+        "main": "https://khv.aero/"
+      },
+      "source": {
+        "url": "https://khv.aero/online/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "sgc",
+      "iata": "SGC",
+      "type": "airport",
+      "name": "Сургут",
+      "city": "Сургут",
+      "aliases": [
+        "Сургут",
+        "Surgut",
+        "SGC"
+      ],
+      "support": {
+        "board": "https://www.airport-surgut.ru/surgut/table/",
+        "phone": "+7 (3462) 770-208",
+        "main": "https://www.airport-surgut.ru/"
+      },
+      "source": {
+        "url": "https://www.airport-surgut.ru/surgut/table/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "cek",
+      "iata": "CEK",
+      "type": "airport",
+      "name": "Челябинск (Баландино)",
+      "city": "Челябинск",
+      "aliases": [
+        "Челябинск",
+        "Баландино",
+        "Chelyabinsk",
+        "CEK"
+      ],
+      "support": {
+        "board": "https://cekport.ru/passengers/information/timetable/",
+        "phone": "+7 (351) 214-18-44",
+        "main": "https://cekport.ru/"
+      },
+      "source": {
+        "url": "https://cekport.ru/passengers/information/timetable/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "pee",
+      "iata": "PEE",
+      "type": "airport",
+      "name": "Пермь (Большое Савино)",
+      "city": "Пермь",
+      "aliases": [
+        "Пермь",
+        "Большое Савино",
+        "Perm",
+        "PEE"
+      ],
+      "support": {
+        "board": "https://aviaperm.ru/passengers/information/timetable/",
+        "phone": "+7 (342) 299-17-71",
+        "main": "https://aviaperm.ru/"
+      },
+      "source": {
+        "url": "https://aviaperm.ru/passengers/information/timetable/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "goj",
+      "iata": "GOJ",
+      "type": "airport",
+      "name": "Нижний Новгород (Стригино)",
+      "city": "Нижний Новгород",
+      "aliases": [
+        "Нижний Новгород",
+        "Стригино",
+        "Nizhny Novgorod",
+        "GOJ"
+      ],
+      "support": {
+        "board": "https://goj.aero/ru/onlayn_tablo",
+        "phone": "+7 (831) 261-80-80",
+        "main": "https://goj.aero/"
+      },
+      "source": {
+        "url": "https://goj.aero/ru/onlayn_tablo",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "oms",
+      "iata": "OMS",
+      "type": "airport",
+      "name": "Омск-Центральный",
+      "city": "Омск",
+      "aliases": [
+        "Омск",
+        "Омск-Центральный",
+        "Omsk",
+        "OMS"
+      ],
+      "support": {
+        "board": "https://aeroomsk.ru/passazhiram/onlayn-tablo/",
+        "phone": "+7 (3812) 55-69-11",
+        "main": "https://aeroomsk.ru/"
+      },
+      "source": {
+        "url": "https://aeroomsk.ru/passazhiram/onlayn-tablo/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "vog",
+      "iata": "VOG",
+      "type": "airport",
+      "name": "Волгоград (Гумрак)",
+      "city": "Волгоград",
+      "aliases": [
+        "Волгоград",
+        "Гумрак",
+        "Volgograd",
+        "VOG"
+      ],
+      "support": {
+        "board": "https://airportvolgograd.ru/passengers/information/timetable/",
+        "phone": "+7 (8442) 32-60-48",
+        "main": "https://airportvolgograd.ru/"
+      },
+      "source": {
+        "url": "https://airportvolgograd.ru/passengers/information/timetable/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "yks",
+      "iata": "YKS",
+      "type": "airport",
+      "name": "Якутск",
+      "city": "Якутск",
+      "aliases": [
+        "Якутск",
+        "Yakutsk",
+        "YKS"
+      ],
+      "support": {
+        "board": "https://yks.aero/online_schedule",
+        "phone": "+7 (4112) 31-88-44",
+        "main": "https://yks.aero/"
+      },
+      "source": {
+        "url": "https://yks.aero/online_schedule",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "uus",
+      "iata": "UUS",
+      "type": "airport",
+      "name": "Южно-Сахалинск (Хомутово)",
+      "city": "Южно-Сахалинск",
+      "aliases": [
+        "Южно-Сахалинск",
+        "Хомутово",
+        "Yuzhno-Sakhalinsk",
+        "UUS"
+      ],
+      "support": {
+        "board": "https://uusaero.ru/flight-board/",
+        "phone": "+7 (4242) 55-95-05",
+        "main": "https://uusaero.ru/"
+      },
+      "source": {
+        "url": "https://uusaero.ru/flight-board/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "pkc",
+      "iata": "PKC",
+      "type": "airport",
+      "name": "Елизово",
+      "city": "Петропавловск-Камчатский",
+      "aliases": [
+        "Елизово",
+        "Петропавловск-Камчатский",
+        "Yelizovo",
+        "PKC"
+      ],
+      "support": {
+        "board": "https://ar-pkc.ru/board/",
+        "phone": "+7 (41531) 99-999",
+        "main": "https://ar-pkc.ru/"
+      },
+      "source": {
+        "url": "https://ar-pkc.ru/board/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "bqs",
+      "iata": "BQS",
+      "type": "airport",
+      "name": "Благовещенск (Игнатьево)",
+      "city": "Благовещенск",
+      "aliases": [
+        "Благовещенск",
+        "Игнатьево",
+        "Blagoveshchensk",
+        "BQS"
+      ],
+      "support": {
+        "board": "https://ar-bqs.ru/board/",
+        "phone": "+7 (4162) 49-49-49",
+        "main": "https://ar-bqs.ru/"
+      },
+      "source": {
+        "url": "https://ar-bqs.ru/board/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "nux",
+      "iata": "NUX",
+      "type": "airport",
+      "name": "Новый Уренгой",
+      "city": "Новый Уренгой",
+      "aliases": [
+        "Новый Уренгой",
+        "Novy Urengoy",
+        "NUX"
+      ],
+      "support": {
+        "board": "https://ar-nux.ru/board/",
+        "phone": "+7 (3494) 93-18-93",
+        "main": "https://ar-nux.ru/"
+      },
+      "source": {
+        "url": "https://ar-nux.ru/board/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "bax",
+      "iata": "BAX",
+      "type": "airport",
+      "name": "Барнаул",
+      "city": "Барнаул",
+      "aliases": [
+        "Барнаул",
+        "Barnaul",
+        "BAX"
+      ],
+      "support": {
+        "board": "https://airaltay.ru/passengers/information/timetable/",
+        "phone": "+7 (3852) 383-787",
+        "main": "https://airaltay.ru/"
+      },
+      "source": {
+        "url": "https://airaltay.ru/passengers/information/timetable/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "mmk",
+      "iata": "MMK",
+      "type": "airport",
+      "name": "Мурманск",
+      "city": "Мурманск",
+      "aliases": [
+        "Мурманск",
+        "Мурмаши",
+        "Murmansk",
+        "MMK"
+      ],
+      "support": {
+        "board": "https://mmkavia.ru/passengers/information/timetable/",
+        "phone": "+7 (8152) 311-400",
+        "main": "https://mmkavia.ru/"
+      },
+      "source": {
+        "url": "https://mmkavia.ru/passengers/information/timetable/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "arh",
+      "iata": "ARH",
+      "type": "airport",
+      "name": "Архангельск (Талаги)",
+      "city": "Архангельск",
+      "aliases": [
+        "Архангельск",
+        "Талаги",
+        "Arkhangelsk",
+        "ARH"
+      ],
+      "support": {
+        "board": "https://arhaero.ru/pax/flying/online-tablo-departure",
+        "phone": "+7 (8182) 608-999",
+        "main": "https://arhaero.ru/"
+      },
+      "source": {
+        "url": "https://arhaero.ru/pax/flying/online-tablo-departure",
+        "verifiedAt": "2026-08-19"
+      }
+    }
+  ],
+  "airlines": [
+    {
+      "id": "aeroflot",
+      "iata": "SU",
+      "type": "airline",
+      "name": "Аэрофлот",
+      "aliases": [
+        "Аэрофлот",
+        "Aeroflot",
+        "SU"
+      ],
+      "support": {
+        "phone": "8 (800) 444-55-55",
+        "phoneAlt": "+7 (495) 223-55-55",
+        "contact": "https://www.aeroflot.ru/ru-ru/help",
+        "main": "https://www.aeroflot.ru/"
+      },
+      "source": {
+        "url": "https://www.aeroflot.ru/ru-ru/help",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "pobeda",
+      "iata": "DP",
+      "type": "airline",
+      "name": "Победа",
+      "aliases": [
+        "Победа",
+        "Pobeda",
+        "DP"
+      ],
+      "support": {
+        "phone": "8 (809) 505-8-777",
+        "phoneNote": "Платная линия",
+        "contact": "https://www.pobeda.aero/information/contacts",
+        "main": "https://www.pobeda.aero/"
+      },
+      "source": {
+        "url": "https://www.pobeda.aero/information/contacts",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "s7",
+      "iata": "S7",
+      "type": "airline",
+      "name": "S7 Airlines",
+      "aliases": [
+        "S7",
+        "S7 Airlines",
+        "Сибирь"
+      ],
+      "support": {
+        "phone": "8 (800) 700-07-07",
+        "phoneAlt": "+7 (495) 783-07-07",
+        "contact": "https://www.s7.ru/ru/pages/contacts/",
+        "main": "https://www.s7.ru/"
+      },
+      "source": {
+        "url": "https://www.s7.ru/ru/pages/contacts/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "rossiya",
+      "iata": "FV",
+      "type": "airline",
+      "name": "Россия",
+      "aliases": [
+        "Россия",
+        "Rossiya",
+        "FV",
+        "HZ"
+      ],
+      "support": {
+        "phone": "8 (800) 444-55-55",
+        "phoneAlt": "8 (800) 250-49-88",
+        "phoneNote": "SU/FV 5501–6999: 8 800 444-55-55; HZ 2441–2479: 8 800 250-49-88",
+        "contact": "https://www.rossiya-airlines.com/about/contacts/",
+        "main": "https://www.rossiya-airlines.com/"
+      },
+      "source": {
+        "url": "https://www.rossiya-airlines.com/about/contacts/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "ural-airlines",
+      "iata": "U6",
+      "type": "airline",
+      "name": "Уральские авиалинии",
+      "aliases": [
+        "Уральские авиалинии",
+        "Ural Airlines",
+        "U6"
+      ],
+      "support": {
+        "phone": "8 (800) 7700-262",
+        "phoneAlt": "+7 (499) 920-22-52",
+        "contact": "https://www.uralairlines.ru/contacts/",
+        "main": "https://www.uralairlines.ru/"
+      },
+      "source": {
+        "url": "https://www.uralairlines.ru/contacts/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "utair",
+      "iata": "UT",
+      "type": "airline",
+      "name": "Utair",
+      "aliases": [
+        "Utair",
+        "ЮТэйр",
+        "UT"
+      ],
+      "support": {
+        "phone": null,
+        "phoneNote": "На актуальной странице помощи основной публичный канал — чат поддержки 24/7",
+        "contact": "https://www.utair.ru/support",
+        "main": "https://www.utair.ru/"
+      },
+      "source": {
+        "url": "https://www.utair.ru/support",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "nordwind",
+      "iata": "N4",
+      "type": "airline",
+      "name": "Nordwind Airlines",
+      "aliases": [
+        "Nordwind",
+        "Северный ветер",
+        "N4"
+      ],
+      "support": {
+        "phone": "+7 (495) 730-43-30",
+        "contact": "https://nordwindairlines.ru/ru/faq/help",
+        "main": "https://nordwindairlines.ru/"
+      },
+      "source": {
+        "url": "https://nordwindairlines.ru/ru/faq/help",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "smartavia",
+      "iata": "5N",
+      "type": "airline",
+      "name": "Smartavia",
+      "aliases": [
+        "Smartavia",
+        "Смартавиа",
+        "5N"
+      ],
+      "support": {
+        "phone": "+7 (809) 505-66-99",
+        "phoneNote": "Основная линия платная",
+        "disruptionPhone": "+7 (495) 970-00-55",
+        "disruptionPhoneNote": "При задержке/отмене доступен с номера из бронирования в течение 10 дней после SMS; оплата по тарифу оператора",
+        "contact": "https://flysmartavia.com/info/smartavia/feedback/call/",
+        "main": "https://flysmartavia.com/"
+      },
+      "source": {
+        "url": "https://flysmartavia.com/info/smartavia/feedback/call/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "red-wings",
+      "iata": "WZ",
+      "type": "airline",
+      "name": "Red Wings",
+      "aliases": [
+        "Red Wings",
+        "Ред Вингс",
+        "WZ"
+      ],
+      "support": {
+        "phone": "+7 (495) 933-03-09",
+        "phoneAlt": "+7 (495) 212-12-51",
+        "contact": "https://flyredwings.com/contacts/",
+        "main": "https://flyredwings.com/"
+      },
+      "source": {
+        "url": "https://flyredwings.com/contacts/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "azur-air",
+      "iata": "ZF",
+      "type": "airline",
+      "name": "AZUR air",
+      "aliases": [
+        "AZUR air",
+        "Азур Эйр",
+        "Azur",
+        "ZF"
+      ],
+      "support": {
+        "phone": "+7 (495) 374-55-14",
+        "contact": "https://azurair.ru/ru/help-contact/contact-us",
+        "main": "https://azurair.ru/"
+      },
+      "source": {
+        "url": "https://azurair.ru/ru/help-contact/contact-us",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "azimuth",
+      "iata": "A4",
+      "type": "airline",
+      "name": "Азимут",
+      "aliases": [
+        "Азимут",
+        "Azimuth",
+        "A4"
+      ],
+      "support": {
+        "phone": "+7 (863) 226-00-05",
+        "contact": "https://azimuth.ru/ru/about/contacts",
+        "main": "https://azimuth.ru/"
+      },
+      "source": {
+        "url": "https://azimuth.ru/ru/about/contacts",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "aurora",
+      "iata": "HZ",
+      "type": "airline",
+      "name": "Аврора",
+      "aliases": [
+        "Аврора",
+        "Aurora",
+        "HZ"
+      ],
+      "support": {
+        "phone": "8 (800) 250-49-88",
+        "contact": "https://www.flyaurora.ru/information/about/contact-centr/",
+        "main": "https://www.flyaurora.ru/"
+      },
+      "source": {
+        "url": "https://www.flyaurora.ru/information/about/contact-centr/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "yamal",
+      "iata": "YC",
+      "type": "airline",
+      "name": "Ямал",
+      "aliases": [
+        "Ямал",
+        "Yamal",
+        "YC"
+      ],
+      "support": {
+        "phone": "8 (800) 444-02-55",
+        "phoneNote": "06:00–18:00 МСК по данным официального сайта",
+        "contact": "https://yamal.aero/contacts",
+        "main": "https://yamal.aero/"
+      },
+      "source": {
+        "url": "https://yamal.aero/contacts",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "iraero",
+      "iata": "IO",
+      "type": "airline",
+      "name": "ИрАэро",
+      "aliases": [
+        "ИрАэро",
+        "IrAero",
+        "IRAERO",
+        "IO"
+      ],
+      "support": {
+        "phone": "8 (800) 707-49-96",
+        "contact": "https://iraero.ru/contacts/",
+        "main": "https://iraero.ru/"
+      },
+      "source": {
+        "url": "https://iraero.ru/contacts/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "nordstar",
+      "iata": "Y7",
+      "type": "airline",
+      "name": "NordStar",
+      "aliases": [
+        "NordStar",
+        "НордСтар",
+        "Y7"
+      ],
+      "support": {
+        "phone": "8 (800) 700-8-007",
+        "phoneAlt": "+7 (495) 967-80-07",
+        "shortPhone": "*0887",
+        "contact": "https://www.nordstar.ru/about/contacts/",
+        "main": "https://www.nordstar.ru/"
+      },
+      "source": {
+        "url": "https://www.nordstar.ru/about/contacts/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "yakutia",
+      "iata": "R3",
+      "type": "airline",
+      "name": "Якутия",
+      "aliases": [
+        "Якутия",
+        "Yakutia",
+        "R3"
+      ],
+      "support": {
+        "phone": "8 (800) 700-21-90",
+        "phoneAlt": "+7 (4112) 491-299",
+        "contact": "https://www.yakutia.aero/o-nas/kontakty/",
+        "main": "https://www.yakutia.aero/"
+      },
+      "source": {
+        "url": "https://www.yakutia.aero/o-nas/kontakty/",
+        "verifiedAt": "2026-08-19"
+      }
+    }
+  ],
+  "sellers": [
+    {
+      "id": "tutu",
+      "type": "seller",
+      "name": "Туту",
+      "aliases": [
+        "Туту",
+        "Tutu",
+        "tutu.ru"
+      ],
+      "support": {
+        "phone": "+7 (499) 715-43-05",
+        "phoneAlt": "8 (800) 505-51-83",
+        "contact": "https://www.tutu.ru/feedback.php",
+        "help": "https://www.tutu.ru/2read/avia/avia_contacts_online/",
+        "main": "https://www.tutu.ru/"
+      },
+      "source": {
+        "url": "https://www.tutu.ru/2read/avia/avia_contacts_online/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "aviasales",
+      "type": "seller",
+      "name": "Авиасейлс",
+      "aliases": [
+        "Авиасейлс",
+        "Aviasales",
+        "aviasales.ru"
+      ],
+      "support": {
+        "phone": null,
+        "phoneNote": "Авиасейлс официально сообщает, что горячей линии нет",
+        "contact": "https://www.aviasales.ru/about/contacts",
+        "help": "https://www.aviasales.ru/psgr/article/kontakty-aviasales",
+        "main": "https://www.aviasales.ru/"
+      },
+      "source": {
+        "url": "https://www.aviasales.ru/about/contacts",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "onetwotrip",
+      "type": "seller",
+      "name": "OneTwoTrip",
+      "aliases": [
+        "OneTwoTrip",
+        "One Two Trip",
+        "onetwotrip.com"
+      ],
+      "support": {
+        "phone": null,
+        "phoneNote": "Для обычных клиентских заказов официальный канал — чат в приложении и support@onetwotrip.com; +7 495 476-60-46 указан только для заказов через партнёров",
+        "email": "support@onetwotrip.com",
+        "contact": "https://support.onetwotrip.com/hc/ru/articles/203380302-%D0%9A%D0%BE%D0%BD%D1%82%D0%B0%D0%BA%D1%82%D1%8B-OneTwoTrip/",
+        "main": "https://www.onetwotrip.com/"
+      },
+      "source": {
+        "url": "https://support.onetwotrip.com/hc/ru/articles/203380302-%D0%9A%D0%BE%D0%BD%D1%82%D0%B0%D0%BA%D1%82%D1%8B-OneTwoTrip/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "yandex-travel",
+      "type": "seller",
+      "name": "Яндекс Путешествия",
+      "aliases": [
+        "Яндекс Путешествия",
+        "Yandex Travel",
+        "travel.yandex.ru"
+      ],
+      "support": {
+        "phone": "8 (800) 511-71-04",
+        "phoneAlt": "8 (800) 700-15-13",
+        "contact": "https://yandex.ru/support/travel/ru/troubleshooting",
+        "main": "https://travel.yandex.ru/"
+      },
+      "source": {
+        "url": "https://yandex.ru/support/travel/ru/troubleshooting",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "ozon-travel",
+      "type": "seller",
+      "name": "Ozon Travel",
+      "aliases": [
+        "Ozon Travel",
+        "Озон Тревел",
+        "Ozon"
+      ],
+      "support": {
+        "phone": null,
+        "phoneNote": "На официальной странице Ozon Travel основной публичный канал — круглосуточный чат 24/7",
+        "contact": "https://www.ozon.ru/travel/support/",
+        "main": "https://www.ozon.ru/travel/"
+      },
+      "source": {
+        "url": "https://www.ozon.ru/travel/support/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "t-travel",
+      "type": "seller",
+      "name": "Т-Путешествия",
+      "aliases": [
+        "Т-Путешествия",
+        "T-Travel",
+        "Tinkoff Travel",
+        "Тинькофф Путешествия"
+      ],
+      "support": {
+        "phone": "8 (800) 333-33-33",
+        "shortPhone": "999",
+        "phoneNote": "Общие контакты Т-Помощи; по поездкам доступен круглосуточный чат",
+        "contact": "https://www.tbank.ru/travel/help/",
+        "main": "https://www.tbank.ru/travel/"
+      },
+      "source": {
+        "url": "https://www.tbank.ru/travel/help/",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "superkassa",
+      "type": "seller",
+      "name": "Superkassa",
+      "aliases": [
+        "Superkassa",
+        "Суперкасса",
+        "superkassa.ru"
+      ],
+      "support": {
+        "phone": "8 (800) 777-05-50",
+        "contact": "https://superkassa.ru/faq",
+        "main": "https://superkassa.ru/"
+      },
+      "source": {
+        "url": "https://superkassa.ru/faq",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "kupibilet",
+      "type": "seller",
+      "name": "Купибилет",
+      "aliases": [
+        "Купибилет",
+        "Kupibilet",
+        "kupibilet.ru"
+      ],
+      "support": {
+        "phone": null,
+        "phoneNote": "Официальный публичный канал для заказов — чат/запрос со страницы заказа",
+        "contact": "https://www.kupibilet.ru/help",
+        "main": "https://www.kupibilet.ru/"
+      },
+      "source": {
+        "url": "https://www.kupibilet.ru/help",
+        "verifiedAt": "2026-08-19"
+      }
+    },
+    {
+      "id": "aviakassa",
+      "type": "seller",
+      "name": "Aviakassa",
+      "aliases": [
+        "Aviakassa",
+        "Авиаккасса",
+        "aviakassa.com"
+      ],
+      "support": {
+        "phone": null,
+        "phoneNote": "На официальной странице контактов публичный общий телефон поддержки не подтверждён; использовать форму/центр поддержки",
+        "contact": "https://www.aviakassa.com/contacts",
+        "main": "https://www.aviakassa.com/"
+      },
+      "source": {
+        "url": "https://www.aviakassa.com/contacts",
+        "verifiedAt": "2026-08-19"
+      }
+    }
+  ]
+}

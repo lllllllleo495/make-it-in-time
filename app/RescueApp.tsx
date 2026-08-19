@@ -1,22 +1,46 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { type CSSProperties, FormEvent, useEffect, useMemo, useState } from "react";
+import supportData from "../data/support-data.json";
 import type {
-  CurrentJourneyStatus,
+  RescueOption,
   RescueSearchRequest,
   ResultCategory,
   SearchResponse,
+  SupportAction,
   TransportMode,
 } from "../lib/domain";
 
+type Screen = "route" | "preferences" | "results" | "support";
+type MainScreen = Exclude<Screen, "support">;
 type PlaceOption = RescueSearchRequest["incident"]["currentPlace"];
+type PlaceSearchOption = PlaceOption & { code: string; aliases: string[] };
+type Baggage = "carry_on" | "checked";
+type FieldErrors = Partial<Record<keyof FormState, string>>;
 
-const PLACE_OPTIONS: PlaceOption[] = [
-  { id: "pulkovo", name: "Пулково", city: "Санкт-Петербург", type: "airport" },
-  { id: "sochi-airport", name: "Аэропорт Сочи", city: "Сочи", type: "airport" },
-  { id: "sheremetyevo", name: "Шереметьево", city: "Москва", type: "airport" },
-  { id: "moskovsky-station", name: "Московский вокзал", city: "Санкт-Петербург", type: "station" },
-];
+const PLACE_OPTIONS: PlaceSearchOption[] = supportData.airports.map((location) => ({
+  id: location.id,
+  name: location.name,
+  city: location.city,
+  type: "airport",
+  code: location.iata,
+  aliases: location.aliases,
+}));
+
+const AIRLINE_OPTIONS = supportData.airlines.map(({ id, name }) => ({ id, name }));
+const SELLER_OPTIONS = supportData.sellers.map(({ id, name }) => ({ id, name }));
+const CITY_OPTIONS = Array.from(new Set(PLACE_OPTIONS.map((place) => place.city)));
+
+const ALL_MODES: TransportMode[] = ["plane", "train", "bus", "suburban"];
+const MIN_SEARCH_DURATION_MS = 1_950;
+
+function apiUrl(path: string) {
+  const runtime = globalThis as typeof globalThis & {
+    __USPET_API_BASE_URL__?: string;
+  };
+  const baseUrl = runtime.__USPET_API_BASE_URL__?.replace(/\/$/u, "") ?? "";
+  return `${baseUrl}${path}`;
+}
 
 const MODE_LABELS: Record<TransportMode, string> = {
   plane: "Самолёт",
@@ -25,93 +49,85 @@ const MODE_LABELS: Record<TransportMode, string> = {
   suburban: "Электричка",
 };
 
+const MODE_ICONS: Record<TransportMode, string> = {
+  plane: "✈️",
+  train: "🚆",
+  bus: "🚌",
+  suburban: "🚊",
+};
+
 const CATEGORY_LABELS: Record<ResultCategory, string> = {
-  fastest: "Самый быстрый",
+  fastest: "Больше всего запаса",
   cheapest: "Самый выгодный",
   fewest_transfers: "Меньше пересадок",
-};
-
-const CONTACT_LABELS = {
-  airline: "Авиакомпания",
-  airport: "Аэропорт",
-  seller: "Продавец билета",
-};
-
-const JOURNEY_COPY: Record<CurrentJourneyStatus, { title: string; text: string }> = {
-  fits: {
-    title: "Исходный рейс пока укладывается в дедлайн",
-    text: "Ожидаемое прибытие не позже указанного времени. Альтернативы ниже можно использовать как запасной план.",
-  },
-  misses: {
-    title: "Исходный рейс не укладывается в дедлайн",
-    text: "Ниже — новые билеты, которые прибывают вовремя по опубликованному расписанию.",
-  },
-  unknown: {
-    title: "Не хватает времени прибытия исходного рейса",
-    text: "Мы не делаем предположений о его прибытии, но всё равно ищем альтернативы до дедлайна.",
-  },
-  cancelled: {
-    title: "Исходный рейс отменён",
-    text: "Ищем новый билет независимо от исходного рейса.",
-  },
+  fastest_within_budget: "Самый быстрый под бюджет",
 };
 
 type FormState = {
   placeId: string;
-  customPlaceName: string;
-  customPlaceCity: string;
-  customPlaceType: "airport" | "station";
-  currentTime: string;
-  disruptionType: "cancelled" | "delayed";
-  scheduledDeparture: string;
-  newDeparture: string;
-  expectedArrival: string;
-  flightNumber: string;
-  airlineId: string;
-  sellerId: string;
+  placeQuery: string;
   destinationCity: string;
   arrivalDeadline: string;
-  readyFrom: string;
-  allowOtherPlaces: boolean;
   passengers: number;
+  baggage: Baggage;
   modes: TransportMode[];
-  priority: ResultCategory;
   maxPrice: string;
-  maxTransfers: number;
+  airlineId: string;
+  sellerId: string;
 };
 
-const DEMO_STATE: FormState = {
-  placeId: "pulkovo",
-  customPlaceName: "",
-  customPlaceCity: "",
-  customPlaceType: "airport",
-  currentTime: "2026-08-19T09:00",
-  disruptionType: "delayed",
-  scheduledDeparture: "2026-08-19T10:30",
-  newDeparture: "2026-08-19T18:00",
-  expectedArrival: "2026-08-19T19:30",
-  flightNumber: "SU 15",
-  airlineId: "aeroflot",
-  sellerId: "tutu",
-  destinationCity: "Москва",
-  arrivalDeadline: "2026-08-19T18:00",
-  readyFrom: "2026-08-19T09:00",
-  allowOtherPlaces: true,
+const EMPTY_FORM: FormState = {
+  placeId: "",
+  placeQuery: "",
+  destinationCity: "",
+  arrivalDeadline: "",
   passengers: 1,
-  modes: ["plane", "train", "bus"],
-  priority: "fastest",
+  baggage: "carry_on",
+  modes: ALL_MODES,
   maxPrice: "",
-  maxTransfers: 2,
+  airlineId: "",
+  sellerId: "",
 };
 
-function toIso(value: string) {
-  return new Date(value).toISOString();
+const SEARCH_FIELDS = new Set<keyof FormState>([
+  "placeId",
+  "placeQuery",
+  "destinationCity",
+  "arrivalDeadline",
+  "passengers",
+  "baggage",
+  "modes",
+  "maxPrice",
+]);
+const SUPPORT_FIELDS = new Set<keyof FormState>([
+  "airlineId",
+  "sellerId",
+]);
+
+function trackSupportEvent(event: string, params: Record<string, string> = {}) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("uspet:analytics", { detail: { event, ...params } }));
+}
+
+function toIso(value: string, label: string) {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) {
+    throw new Error(`Проверьте поле «${label}»`);
+  }
+  return date.toISOString();
 }
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("ru-RU", {
     day: "numeric",
     month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatTime(value: string) {
+  return new Intl.DateTimeFormat("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
@@ -124,69 +140,127 @@ function formatDuration(minutes: number) {
   return rest ? `${hours} ч ${rest} мин` : `${hours} ч`;
 }
 
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("ru-RU").format(value) + " ₽";
+function formatMoney(value: number, currency = "RUB") {
+  const fractionDigits = Number.isInteger(value) ? 0 : 2;
+  return new Intl.NumberFormat("ru-RU", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(value);
 }
 
-function buildRequest(form: FormState): RescueSearchRequest {
-  const place = form.placeId === "custom"
-    ? {
-        id: `custom-${form.customPlaceType}`,
-        name: form.customPlaceName.trim(),
-        city: form.customPlaceCity.trim(),
-        type: form.customPlaceType,
-      }
-    : PLACE_OPTIONS.find((option) => option.id === form.placeId);
-  if (!place) throw new Error("Выберите аэропорт или вокзал");
+function withoutTerminalPeriod(value: string) {
+  return value.trimEnd().replace(/\.$/u, "");
+}
 
+function formatDay(value: string) {
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "short",
+  }).format(new Date(value));
+}
+
+function getPlace(form: FormState): PlaceOption | undefined {
+  const selected = PLACE_OPTIONS.find((option) => option.id === form.placeId);
+  if (selected) return selected;
+  if (form.placeQuery.trim().length >= 2) {
+    return {
+      id: "custom-location",
+      name: form.placeQuery.trim(),
+      city: form.placeQuery.trim(),
+      type: "airport",
+    };
+  }
+  return undefined;
+}
+
+function validateRoute(form: FormState) {
+  const errors: FieldErrors = {};
+  const place = getPlace(form);
+
+  if (!place) errors.placeQuery = "Введите город, аэропорт или вокзал";
+  if (!form.destinationCity.trim()) {
+    errors.destinationCity = "Укажите город назначения";
+  }
+
+  const deadline = Date.parse(form.arrivalDeadline);
+  if (!form.arrivalDeadline || Number.isNaN(deadline)) {
+    errors.arrivalDeadline = "Укажите дату и время";
+  } else if (deadline <= Date.now()) {
+    errors.arrivalDeadline = "Дедлайн должен быть позже текущего времени";
+  }
+
+  return { errors, place };
+}
+
+function validatePreferences(form: FormState) {
+  const errors: FieldErrors = {};
+  if (!Number.isInteger(form.passengers) || form.passengers < 1 || form.passengers > 6) {
+    errors.passengers = "От 1 до 6 пассажиров";
+  }
+  if (form.maxPrice && Number(form.maxPrice) < 500) {
+    errors.maxPrice = "Минимальный бюджет — 500 ₽";
+  }
+  if (!form.modes.length) {
+    errors.modes = "Выберите хотя бы один вид транспорта";
+  }
+  return errors;
+}
+
+function buildRequest(form: FormState, place: PlaceOption): RescueSearchRequest {
+  const now = new Date().toISOString();
   return {
     incident: {
       currentPlace: place,
-      currentTime: toIso(form.currentTime),
-      disruptionType: form.disruptionType,
-      scheduledDeparture: toIso(form.scheduledDeparture),
-      newDeparture:
-        form.disruptionType === "delayed" ? toIso(form.newDeparture) : undefined,
-      expectedArrival: form.expectedArrival
-        ? toIso(form.expectedArrival)
-        : undefined,
-      flightNumber: form.flightNumber || undefined,
-      airlineId: form.airlineId || undefined,
-      sellerId: form.sellerId || undefined,
+      currentTime: now,
+      timezoneOffsetMinutes: new Date().getTimezoneOffset(),
+      disruptionType: "delayed",
     },
     destination: {
       city: form.destinationCity.trim(),
-      arrivalDeadline: toIso(form.arrivalDeadline),
+      arrivalDeadline: toIso(form.arrivalDeadline, "Дедлайн"),
     },
     departure: {
-      readyFrom: toIso(form.readyFrom),
-      allowOtherPlaces: form.allowOtherPlaces,
+      readyFrom: now,
+      allowOtherPlaces: true,
     },
     preferences: {
       passengers: form.passengers,
+      baggage: form.baggage,
       modes: form.modes,
-      priority: form.priority,
+      priority: "fastest",
       maxPrice: form.maxPrice ? Number(form.maxPrice) : undefined,
-      maxTransfers: form.maxTransfers,
+      maxTransfers: 3,
     },
   };
 }
 
 export function RescueApp() {
-  const [form, setForm] = useState<FormState>(DEMO_STATE);
+  const [screen, setScreen] = useState<Screen>("route");
+  const [returnScreen, setReturnScreen] = useState<MainScreen>("route");
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [result, setResult] = useState<SearchResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [support, setSupport] = useState<SearchResponse["support"] | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [supportError, setSupportError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSupportLoading, setIsSupportLoading] = useState(false);
 
-  const place = useMemo(
-    () => form.placeId === "custom"
-      ? { name: form.customPlaceName || "Другая точка" }
-      : PLACE_OPTIONS.find((option) => option.id === form.placeId),
-    [form.placeId, form.customPlaceName],
-  );
+  const place = useMemo(() => getPlace(form), [form]);
 
   function setField<Key extends keyof FormState>(key: Key, value: FormState[Key]) {
     setForm((current) => ({ ...current, [key]: value }));
+    setFieldErrors((current) => ({ ...current, [key]: undefined }));
+    setSearchError(null);
+    setSupportError(null);
+    if (SEARCH_FIELDS.has(key)) {
+      setResult(null);
+    }
+    if (SUPPORT_FIELDS.has(key)) {
+      setSupport(null);
+    }
   }
 
   function toggleMode(mode: TransportMode) {
@@ -196,427 +270,955 @@ export function RescueApp() {
         ? current.modes.filter((item) => item !== mode)
         : [...current.modes, mode],
     }));
+    setFieldErrors((current) => ({ ...current, modes: undefined }));
+    setResult(null);
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function continueToPreferences(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
+    const validation = validateRoute(form);
+    setFieldErrors(validation.errors);
+    if (Object.keys(validation.errors).length || !validation.place) return;
+    setScreen("preferences");
+  }
 
-    if (!form.modes.length) {
-      setError("Выберите хотя бы один вид транспорта.");
+  async function searchRoutes(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isLoading) return;
+
+    const routeValidation = validateRoute(form);
+    const preferenceErrors = validatePreferences(form);
+    const errors = { ...routeValidation.errors, ...preferenceErrors };
+    setFieldErrors(errors);
+    setSearchError(null);
+
+    if (Object.keys(routeValidation.errors).length || !routeValidation.place) {
+      setScreen("route");
       return;
     }
+    if (Object.keys(preferenceErrors).length) return;
 
+    const searchStartedAt = Date.now();
     setIsLoading(true);
-    setResult(null);
-
     try {
-      const response = await fetch("/api/search", {
+      const response = await fetch(apiUrl("/api/search"), {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(buildRequest(form)),
+        body: JSON.stringify(buildRequest(form, routeValidation.place)),
       });
-      const payload = await response.json();
-
+      const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        const detail = payload.issues?.[0]?.message;
-        throw new Error(detail || payload.error || "Не удалось выполнить поиск");
+        throw new Error(payload?.issues?.[0]?.message || payload?.error || "Не удалось загрузить варианты");
       }
-
+      const waitTime = MIN_SEARCH_DURATION_MS - (Date.now() - searchStartedAt);
+      if (waitTime > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, waitTime));
+      }
       setResult(payload as SearchResponse);
-      requestAnimationFrame(() => {
-        document.getElementById("results")?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      });
+      setReturnScreen((current) => current === "preferences" ? "results" : current);
+      setScreen((current) => current === "preferences" ? "results" : current);
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Что-то пошло не так. Попробуйте ещё раз.",
+      const message = caught instanceof Error ? caught.message : "";
+      setSearchError(
+        /failed to fetch|unexpected token|json/i.test(message)
+          ? "Не удалось загрузить варианты. Проверьте связь и попробуйте снова."
+          : message || "Не удалось загрузить варианты. Попробуйте снова.",
       );
     } finally {
       setIsLoading(false);
     }
   }
 
+  async function loadSupport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isSupportLoading) return;
+    if (!place) {
+      setSupportError("Укажите, где вы сейчас");
+      return;
+    }
+    setSupportError(null);
+    setIsSupportLoading(true);
+    try {
+      const response = await fetch(apiUrl("/api/support"), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          currentPlaceId: place.id,
+          airlineId: form.airlineId || undefined,
+          sellerId: form.sellerId || undefined,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || "Не удалось загрузить контакты");
+      setSupport(payload as SearchResponse["support"]);
+      for (const miss of payload?.misses ?? []) {
+        trackSupportEvent("support_directory_miss", {
+          entityType: miss.entityType,
+          entityId: miss.entityId,
+        });
+      }
+    } catch (caught) {
+      setSupportError(caught instanceof Error ? caught.message : "Не удалось загрузить контакты");
+    } finally {
+      setIsSupportLoading(false);
+    }
+  }
+
+  const goTo = (next: Screen) => {
+    if (next === "results" && !result) return;
+    setScreen(next);
+  };
+
+  function toggleSupport() {
+    if (screen === "support") {
+      setScreen(returnScreen);
+      return;
+    }
+    setReturnScreen(screen);
+    setScreen("support");
+  }
+
   return (
-    <main>
-      <header className="topbar">
-        <a className="brand" href="#top" aria-label="Успеть — на главную">
+    <div className="app-shell">
+      <AppHeader
+        screen={screen === "support" ? returnScreen : screen}
+        canOpenPreferences={Boolean(place && form.destinationCity.trim() && form.arrivalDeadline)}
+        hasResults={Boolean(result)}
+        onNavigate={goTo}
+      />
+
+      {screen === "route" && (
+        <RouteScreen
+          form={form}
+          fieldErrors={fieldErrors}
+          onField={setField}
+          onSubmit={continueToPreferences}
+        />
+      )}
+
+      {screen === "preferences" && place && (
+        <PreferencesScreen
+          form={form}
+          place={place}
+          fieldErrors={fieldErrors}
+          searchError={searchError}
+          isLoading={isLoading}
+          onField={setField}
+          onToggleMode={toggleMode}
+          onBack={() => setScreen("route")}
+          onSubmit={searchRoutes}
+        />
+      )}
+
+      {screen === "results" && result && place && (
+        <ResultsScreen
+          response={result}
+          form={form}
+          place={place}
+          onEditRoute={() => setScreen("route")}
+          onEditPreferences={() => setScreen("preferences")}
+        />
+      )}
+
+      {screen === "support" && (
+        <SupportScreen
+          form={form}
+          place={place}
+          support={support}
+          supportError={supportError}
+          isLoading={isSupportLoading}
+          onField={setField}
+          onSubmit={loadSupport}
+        />
+      )}
+
+      <button
+        className={`support-launcher${screen === "support" ? " active" : ""}`}
+        type="button"
+        aria-label={screen === "support" ? "Закрыть помощь" : "Открыть помощь с рейсом"}
+        onClick={toggleSupport}
+      >
+        <span aria-hidden="true">{screen === "support" ? "×" : "?"}</span>
+        {screen === "support" ? "Закрыть" : "Помощь с рейсом"}
+      </button>
+    </div>
+  );
+}
+
+function AppHeader({
+  screen,
+  canOpenPreferences,
+  hasResults,
+  onNavigate,
+}: {
+  screen: Screen;
+  canOpenPreferences: boolean;
+  hasResults: boolean;
+  onNavigate: (screen: Screen) => void;
+}) {
+  const steps: { id: Screen; label: string }[] = [
+    { id: "route", label: "Маршрут" },
+    { id: "preferences", label: "Детали" },
+    { id: "results", label: "Варианты" },
+  ];
+  const currentIndex = steps.findIndex((step) => step.id === screen);
+
+  return (
+    <header className="app-header">
+      <div className="header-inner">
+        <button className="brand" type="button" onClick={() => onNavigate("route")} aria-label="Успеть — к маршруту">
           <span className="brand-mark" aria-hidden="true">У</span>
           <span>Успеть</span>
-        </a>
-        <div className="prototype-label">
-          <span className="live-dot" aria-hidden="true" />
-          MVP для Туту MCP
-        </div>
-      </header>
+        </button>
+        <nav className="step-nav" aria-label="Этапы">
+          {steps.map((step, index) => {
+            const canOpen = step.id === "route" || (step.id === "preferences" && canOpenPreferences) || (step.id === "results" && hasResults);
+            return (
+              <button
+                className={`${screen === step.id ? "active " : ""}${index < currentIndex ? "done" : ""}`.trim()}
+                type="button"
+                disabled={!canOpen}
+                onClick={() => onNavigate(step.id)}
+                key={step.id}
+              >
+                <span>{index + 1}</span>{step.label}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+    </header>
+  );
+}
 
-      <section className="hero" id="top">
-        <div className="hero-copy">
-          <p className="eyebrow">План Б после отмены или переноса</p>
-          <h1>Сорвало рейс?<br /><span>Ещё можно успеть.</span></h1>
-          <p className="hero-lead">
-            Сообщите, где вы, когда готовы выехать и к какому времени нужно
-            прибыть. Мы покажем до трёх разных билетов, которые укладываются в
-            дедлайн по расписанию.
-          </p>
-        </div>
+type SharedFormProps = {
+  form: FormState;
+  fieldErrors: FieldErrors;
+  onField: <Key extends keyof FormState>(key: Key, value: FormState[Key]) => void;
+};
 
-        <div className="hero-note" aria-label="Как работает сервис">
-          <p className="note-number">≤ 3</p>
-          <p className="note-title">подходящих варианта</p>
-          <p className="note-text">Без дублей и заведомо опаздывающих маршрутов</p>
-        </div>
+function RouteScreen({
+  form,
+  fieldErrors,
+  onField,
+  onSubmit,
+}: SharedFormProps & { onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+  return (
+    <main className="flow-screen route-screen">
+      <section className="page-heading">
+        <h1>Найдём способ <span>успеть</span></h1>
+        <p>Покажем только билеты, которые по расписанию прибывают до вашего дедлайна</p>
       </section>
 
-      <section className="search-section" aria-labelledby="search-title">
-        <div className="section-heading">
-          <div>
-            <p className="step-label">Шаг 1</p>
-            <h2 id="search-title">Расскажите, что произошло</h2>
-          </div>
-          <button className="text-button" type="button" onClick={() => {
-            setForm(DEMO_STATE);
-            setResult(null);
-            setError(null);
-          }}>
-            Заполнить демо-кейс
-          </button>
+      <form id="route-form" className="panel route-form" onSubmit={onSubmit} noValidate>
+        <div className="route-fields">
+          <SearchablePlace
+            value={form.placeQuery}
+            selectedId={form.placeId}
+            error={fieldErrors.placeQuery}
+            onQueryChange={(value) => {
+              onField("placeQuery", value);
+              onField("placeId", "");
+            }}
+            onSelect={(option) => {
+              onField("placeId", option.id);
+              onField("placeQuery", `${option.city}, ${option.name}`);
+            }}
+          />
+
+          <SearchableDestination
+            value={form.destinationCity}
+            error={fieldErrors.destinationCity}
+            onChange={(value) => onField("destinationCity", value)}
+          />
+
+          <Field label="Быть на месте не позже" error={fieldErrors.arrivalDeadline} htmlFor="deadline">
+            <input
+              id="deadline"
+              type="datetime-local"
+              value={form.arrivalDeadline}
+              aria-invalid={Boolean(fieldErrors.arrivalDeadline)}
+              onInput={(event) => onField("arrivalDeadline", event.currentTarget.value)}
+            />
+          </Field>
         </div>
 
-        <form className="rescue-form" onSubmit={handleSubmit}>
-          <fieldset className="form-card form-card-incident">
-            <legend><span>01</span> Исходный рейс</legend>
-            <div className="field-grid two-columns">
-              <label className="field field-wide">
-                <span>Где вы сейчас</span>
-                <select value={form.placeId} onChange={(event) => setField("placeId", event.target.value)}>
-                  {PLACE_OPTIONS.map((option) => (
-                    <option value={option.id} key={option.id}>
-                      {option.name}, {option.city}
-                    </option>
-                  ))}
-                  <option value="custom">Другой аэропорт или вокзал…</option>
-                </select>
-                <small>Аэропорт или вокзал — не геолокация</small>
-              </label>
-
-              {form.placeId === "custom" && (
-                <>
-                  <label className="field">
-                    <span>Название точки</span>
-                    <input type="text" required placeholder="Например, аэропорт Кольцово" value={form.customPlaceName} onChange={(event) => setField("customPlaceName", event.target.value)} />
-                  </label>
-                  <label className="field">
-                    <span>Город отправления</span>
-                    <input type="text" required placeholder="Например, Екатеринбург" value={form.customPlaceCity} onChange={(event) => setField("customPlaceCity", event.target.value)} />
-                  </label>
-                  <div className="field field-wide">
-                    <span>Тип точки</span>
-                    <div className="segmented" role="radiogroup" aria-label="Тип точки отправления">
-                      <label className={form.customPlaceType === "airport" ? "active" : ""}>
-                        <input type="radio" name="placeType" checked={form.customPlaceType === "airport"} onChange={() => setField("customPlaceType", "airport")} />
-                        Аэропорт
-                      </label>
-                      <label className={form.customPlaceType === "station" ? "active" : ""}>
-                        <input type="radio" name="placeType" checked={form.customPlaceType === "station"} onChange={() => setField("customPlaceType", "station")} />
-                        Вокзал
-                      </label>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              <label className="field">
-                <span>Сейчас, местное время</span>
-                <input type="datetime-local" required value={form.currentTime} onChange={(event) => setField("currentTime", event.target.value)} />
-              </label>
-
-              <label className="field">
-                <span>Рейс был назначен на</span>
-                <input type="datetime-local" required value={form.scheduledDeparture} onChange={(event) => setField("scheduledDeparture", event.target.value)} />
-              </label>
-
-              <div className="field field-wide">
-                <span>Что случилось</span>
-                <div className="segmented" role="radiogroup" aria-label="Что случилось с рейсом">
-                  <label className={form.disruptionType === "delayed" ? "active" : ""}>
-                    <input type="radio" name="disruption" checked={form.disruptionType === "delayed"} onChange={() => setField("disruptionType", "delayed")} />
-                    Перенесли
-                  </label>
-                  <label className={form.disruptionType === "cancelled" ? "active" : ""}>
-                    <input type="radio" name="disruption" checked={form.disruptionType === "cancelled"} onChange={() => setField("disruptionType", "cancelled")} />
-                    Отменили
-                  </label>
-                </div>
-              </div>
-
-              {form.disruptionType === "delayed" && (
-                <label className="field">
-                  <span>Новое время вылета</span>
-                  <input type="datetime-local" required value={form.newDeparture} onChange={(event) => setField("newDeparture", event.target.value)} />
-                </label>
-              )}
-
-              <label className="field">
-                <span>Ожидаемое прибытие <em>необязательно</em></span>
-                <input type="datetime-local" value={form.expectedArrival} onChange={(event) => setField("expectedArrival", event.target.value)} />
-              </label>
-
-              <label className="field">
-                <span>Номер рейса <em>необязательно</em></span>
-                <input type="text" placeholder="Например, SU 15" value={form.flightNumber} onChange={(event) => setField("flightNumber", event.target.value)} />
-              </label>
-
-              <label className="field">
-                <span>Авиакомпания</span>
-                <select value={form.airlineId} onChange={(event) => setField("airlineId", event.target.value)}>
-                  <option value="">Не указана</option>
-                  <option value="aeroflot">Аэрофлот</option>
-                </select>
-              </label>
-
-              <label className="field">
-                <span>Где куплен билет</span>
-                <select value={form.sellerId} onChange={(event) => setField("sellerId", event.target.value)}>
-                  <option value="">Не указано</option>
-                  <option value="tutu">Туту</option>
-                </select>
-              </label>
-            </div>
-          </fieldset>
-
-          <fieldset className="form-card form-card-goal">
-            <legend><span>02</span> Цель поездки</legend>
-            <div className="field-grid">
-              <label className="field field-wide">
-                <span>Куда нужно попасть</span>
-                <input list="cities" type="text" required placeholder="Город" value={form.destinationCity} onChange={(event) => setField("destinationCity", event.target.value)} />
-                <datalist id="cities">
-                  <option value="Москва" />
-                  <option value="Санкт-Петербург" />
-                  <option value="Сочи" />
-                  <option value="Казань" />
-                </datalist>
-              </label>
-
-              <label className="field field-emphasis field-wide">
-                <span>Быть в городе не позже</span>
-                <input type="datetime-local" required value={form.arrivalDeadline} onChange={(event) => setField("arrivalDeadline", event.target.value)} />
-                <small>Считаем прибытие на вокзал или в аэропорт города</small>
-              </label>
-
-              <label className="field field-wide">
-                <span>Готов отправляться не раньше</span>
-                <input type="datetime-local" required value={form.readyFrom} onChange={(event) => setField("readyFrom", event.target.value)} />
-              </label>
-
-              <div className="switch-row field-wide">
-                <input id="allow-other-places" type="checkbox" checked={form.allowOtherPlaces} onChange={(event) => setField("allowOtherPlaces", event.target.checked)} />
-                <span className="switch" aria-hidden="true" />
-                <label htmlFor="allow-other-places">
-                  <strong>Искать из других вокзалов и аэропортов города</strong>
-                  <small>Время дороги до них не включаем</small>
-                </label>
-              </div>
-            </div>
-          </fieldset>
-
-          <fieldset className="form-card form-card-filters">
-            <legend><span>03</span> Дополнительные параметры</legend>
-            <div className="field-grid two-columns">
-              <div className="field field-wide">
-                <span>Виды транспорта</span>
-                <div className="chip-group">
-                  {(Object.keys(MODE_LABELS) as TransportMode[]).map((mode) => (
-                    <label className={form.modes.includes(mode) ? "chip active" : "chip"} key={mode}>
-                      <input type="checkbox" checked={form.modes.includes(mode)} onChange={() => toggleMode(mode)} />
-                      {MODE_LABELS[mode]}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <label className="field">
-                <span>Пассажиров</span>
-                <input type="number" min="1" max="9" required value={form.passengers} onChange={(event) => setField("passengers", Number(event.target.value))} />
-              </label>
-
-              <label className="field">
-                <span>Максимум пересадок</span>
-                <select value={form.maxTransfers} onChange={(event) => setField("maxTransfers", Number(event.target.value))}>
-                  <option value={0}>Без пересадок</option>
-                  <option value={1}>1 пересадка</option>
-                  <option value={2}>До 2 пересадок</option>
-                  <option value={3}>До 3 пересадок</option>
-                </select>
-              </label>
-
-              <label className="field">
-                <span>Бюджет до <em>необязательно</em></span>
-                <div className="input-suffix">
-                  <input type="number" min="1" placeholder="Без ограничения" value={form.maxPrice} onChange={(event) => setField("maxPrice", event.target.value)} />
-                  <span>₽</span>
-                </div>
-              </label>
-
-              <label className="field">
-                <span>Что важнее</span>
-                <select value={form.priority} onChange={(event) => setField("priority", event.target.value as ResultCategory)}>
-                  <option value="fastest">Приехать раньше</option>
-                  <option value="cheapest">Потратить меньше</option>
-                  <option value="fewest_transfers">Меньше пересадок</option>
-                </select>
-              </label>
-            </div>
-          </fieldset>
-
-          <div className="submit-panel">
-            <div>
-              <p>{place?.name} → {form.destinationCity || "город назначения"}</p>
-              <span>Сначала проверим обязательные поля, затем запросим билеты</span>
-            </div>
-            <button className="primary-button" type="submit" disabled={isLoading}>
-              {isLoading ? <><span className="spinner" aria-hidden="true" /> Ищем варианты</> : <>Найти, как успеть <span aria-hidden="true">→</span></>}
-            </button>
-          </div>
-
-          {error && <div className="form-error" role="alert">{error}</div>}
-        </form>
-      </section>
-
-      <section className="scope-strip" aria-label="Границы расчёта">
-        <p><strong>Что учитываем:</strong> готовность к отправлению, прибытие до дедлайна, цену, транспорт и пересадки.</p>
-        <p><strong>Пока не учитываем:</strong> дорогу до точки отправления, регистрацию, досмотр, багаж и дорогу по городу назначения.</p>
-      </section>
-
-      {result && <Results response={result} destination={form.destinationCity} />}
-
-      <footer>
-        <a className="brand footer-brand" href="#top"><span className="brand-mark">У</span><span>Успеть</span></a>
-        <p>Экстренный поиск билетов после срыва рейса · MVP для ИИ-хакатона Туту</p>
-      </footer>
+        <div className="form-actions">
+          <button className="primary-button compact-button" type="submit">Продолжить</button>
+        </div>
+      </form>
     </main>
   );
 }
 
-function Results({ response, destination }: { response: SearchResponse; destination: string }) {
-  const journeyCopy = JOURNEY_COPY[response.currentJourneyStatus];
+function SearchablePlace({
+  value,
+  selectedId,
+  error,
+  onQueryChange,
+  onSelect,
+}: {
+  value: string;
+  selectedId: string;
+  error?: string;
+  onQueryChange: (value: string) => void;
+  onSelect: (option: PlaceSearchOption) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const normalizedQuery = value.trim().toLocaleLowerCase("ru-RU");
+  const filtered = PLACE_OPTIONS.filter((option) => {
+    if (!normalizedQuery) return true;
+    return [option.name, option.city, option.code, ...option.aliases]
+      .join(" ")
+      .toLocaleLowerCase("ru-RU")
+      .includes(normalizedQuery);
+  }).slice(0, 7);
 
   return (
-    <section className="results-section" id="results" aria-live="polite">
-      <div className="section-heading results-heading">
-        <div>
-          <p className="step-label">Шаг 2</p>
-          <h2>Варианты, чтобы успеть</h2>
-        </div>
-        <div className="data-badge">
-          {response.dataSource === "tutu-mcp" ? "Данные Туту MCP" : "Демо-данные"}
-        </div>
-      </div>
-
-      <div className={`journey-status status-${response.currentJourneyStatus}`}>
-        <span className="status-symbol" aria-hidden="true">
-          {response.currentJourneyStatus === "fits" ? "✓" : response.currentJourneyStatus === "unknown" ? "?" : "!"}
-        </span>
-        <div><strong>{journeyCopy.title}</strong><p>{journeyCopy.text}</p></div>
-      </div>
-
-      {response.options.length ? (
-        <>
-          <div className="results-summary">
-            <p><strong>{response.options.length}</strong> {response.options.length === 1 ? "вариант" : "варианта"} прибывают в {destination} вовремя по расписанию</p>
-            <span>Ещё {response.rejectedCount} не прошли ограничения</span>
-          </div>
-          <div className="options-grid">
-            {response.options.map((option, index) => (
-              <article className="option-card" key={option.id}>
-                <div className="option-topline">
-                  <span className="option-number">0{index + 1}</span>
-                  <span className={`category category-${option.category}`}>{CATEGORY_LABELS[option.category]}</span>
-                </div>
-                <h3>{option.title}</h3>
-                <p className="mode-line">{option.segments.map((segment) => MODE_LABELS[segment.mode]).join(" + ")} · {option.transferCount === 0 ? "без пересадок" : `${option.transferCount} перес.`}</p>
-
-                <div className="route-times">
-                  <div><time>{formatDateTime(option.departureAt)}</time><span>{option.segments[0]?.fromStation}</span></div>
-                  <div className="route-line" aria-hidden="true"><span /></div>
-                  <div><time>{formatDateTime(option.arrivalAt)}</time><span>{option.segments.at(-1)?.toStation}</span></div>
-                </div>
-
-                <div className="margin-box">
-                  <span aria-hidden="true">✓</span>
-                  Запас до дедлайна: <strong>{formatDuration(option.deadlineMarginMinutes)}</strong>
-                </div>
-
-                <div className="option-meta">
-                  <div><span>Цена за всех</span><strong>{formatMoney(option.totalPrice)}</strong></div>
-                  {option.seatsLeft && <div><span>Осталось мест</span><strong>{option.seatsLeft}</strong></div>}
-                </div>
-
-                <a className="booking-button" href={option.bookingUrl} target="_blank" rel="noreferrer">
-                  Перейти к билету <span aria-hidden="true">↗</span>
-                </a>
-              </article>
-            ))}
-          </div>
-          <p className="schedule-warning">Время и наличие мест нужно повторно проверить перед покупкой. «Успеть» сравнивает опубликованное расписание и не гарантирует фактическое прибытие.</p>
-        </>
-      ) : (
-        <div className="empty-state">
-          <span aria-hidden="true">×</span>
-          <h3>До этого дедлайна вариантов не найдено</h3>
-          <p>Мы не будем показывать билет, с которым вы опоздаете. Попробуйте перенести дедлайн, выбрать следующий день или снять часть ограничений.</p>
-          <a href="#search-title">Изменить параметры</a>
+    <div className="field place-combobox">
+      <label className="field-label" htmlFor="place-search">Где вы сейчас</label>
+      <input
+        id="place-search"
+        type="text"
+        role="combobox"
+        autoComplete="off"
+        placeholder="Город, аэропорт или вокзал"
+        value={value}
+        aria-expanded={isOpen}
+        aria-controls="place-options"
+        aria-invalid={Boolean(error)}
+        onFocus={() => setIsOpen(true)}
+        onBlur={() => window.setTimeout(() => setIsOpen(false), 120)}
+        onChange={(event) => {
+          onQueryChange(event.target.value);
+          setIsOpen(true);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && isOpen && filtered[0]) {
+            event.preventDefault();
+            onSelect(filtered[0]);
+            setIsOpen(false);
+          }
+        }}
+      />
+      {isOpen && filtered.length > 0 && (
+        <div className="place-options" id="place-options" role="listbox">
+          {filtered.map((option) => (
+            <button
+              className={selectedId === option.id ? "selected" : ""}
+              type="button"
+              role="option"
+              aria-selected={selectedId === option.id}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                onSelect(option);
+                setIsOpen(false);
+              }}
+              key={option.id}
+            >
+              <span className="place-icon" aria-hidden="true">{option.type === "airport" ? "✈" : "●"}</span>
+              <span><strong>{option.city}</strong><small>{option.name}</small></span>
+              {option.code && <b>{option.code}</b>}
+            </button>
+          ))}
         </div>
       )}
+      <FieldError id="place-search-error" message={error} />
+    </div>
+  );
+}
 
-      <Support response={response} />
+function SearchableDestination({
+  value,
+  error,
+  onChange,
+}: {
+  value: string;
+  error?: string;
+  onChange: (value: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const normalizedQuery = value.trim().toLocaleLowerCase("ru-RU");
+  const filtered = CITY_OPTIONS.filter((city) =>
+    !normalizedQuery || city.toLocaleLowerCase("ru-RU").includes(normalizedQuery),
+  ).slice(0, 7);
+
+  function choose(city: string) {
+    onChange(city);
+    setIsOpen(false);
+  }
+
+  return (
+    <div className="field place-combobox destination-combobox">
+      <label className="field-label" htmlFor="destination">Куда нужно попасть</label>
+      <input
+        id="destination"
+        type="text"
+        role="combobox"
+        autoComplete="off"
+        placeholder="Например, Москва"
+        value={value}
+        aria-expanded={isOpen}
+        aria-controls="destination-options"
+        aria-invalid={Boolean(error)}
+        onFocus={() => setIsOpen(true)}
+        onBlur={() => window.setTimeout(() => setIsOpen(false), 120)}
+        onChange={(event) => {
+          onChange(event.target.value);
+          setIsOpen(true);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && isOpen && filtered[0]) {
+            event.preventDefault();
+            choose(filtered[0]);
+          }
+        }}
+      />
+      {isOpen && filtered.length > 0 && (
+        <div className="place-options destination-options" id="destination-options" role="listbox">
+          {filtered.map((city) => (
+            <button
+              className={value === city ? "selected" : ""}
+              type="button"
+              role="option"
+              aria-selected={value === city}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => choose(city)}
+              key={city}
+            >
+              <span className="place-icon" aria-hidden="true">●</span>
+              <span><strong>{city}</strong><small>Город</small></span>
+            </button>
+          ))}
+        </div>
+      )}
+      <FieldError id="destination-error" message={error} />
+    </div>
+  );
+}
+
+function PreferencesScreen({
+  form,
+  place,
+  fieldErrors,
+  searchError,
+  isLoading,
+  onField,
+  onToggleMode,
+  onBack,
+  onSubmit,
+}: SharedFormProps & {
+  place: PlaceOption;
+  searchError: string | null;
+  isLoading: boolean;
+  onToggleMode: (mode: TransportMode) => void;
+  onBack: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  if (isLoading) {
+    return (
+      <main className="flow-screen preferences-screen searching-screen">
+        <section className="page-heading compact-heading searching-heading">
+          <h1>Ищем варианты</h1>
+          <p>Собираем билеты и сверяем их с вашим дедлайном</p>
+        </section>
+        <TripSummary place={place} form={form} />
+        <SearchingState destination={form.destinationCity} modes={form.modes} />
+      </main>
+    );
+  }
+
+  return (
+    <main className="flow-screen preferences-screen">
+      <section className="page-heading compact-heading">
+        <h1>Что учесть?</h1>
+        <p>Выберите подходящие условия — и найдём варианты</p>
+      </section>
+      <TripSummary place={place} form={form} />
+
+      <form id="preferences-form" className="panel preferences-form" onSubmit={onSubmit} noValidate>
+        <div className="preference-grid">
+          <div className="field baggage-field">
+            <span className="field-label">Багаж</span>
+            <div className="chip-group baggage-chip-group" role="radiogroup" aria-label="Багаж">
+              {([
+                ["carry_on", "Ручная кладь"],
+                ["checked", "С багажом"],
+              ] as [Baggage, string][]).map(([value, label]) => (
+                <label className={form.baggage === value ? "chip active" : "chip"} key={value}>
+                  <input type="radio" name="baggage" checked={form.baggage === value} onChange={() => onField("baggage", value)} />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="field passengers-field">
+            <span className="field-label">Пассажиры</span>
+            <div className="passenger-counter" role="group" aria-label="Количество пассажиров">
+              <button type="button" aria-label="Уменьшить количество пассажиров" disabled={form.passengers <= 1} onClick={() => onField("passengers", form.passengers - 1)}>−</button>
+              <strong aria-live="polite">{form.passengers}</strong>
+              <button type="button" aria-label="Увеличить количество пассажиров" disabled={form.passengers >= 6} onClick={() => onField("passengers", form.passengers + 1)}>+</button>
+            </div>
+            <FieldError id="passengers-error" message={fieldErrors.passengers} />
+          </div>
+
+          <BudgetInput value={form.maxPrice} error={fieldErrors.maxPrice} onChange={(value) => onField("maxPrice", value)} />
+
+          <div className="field transport-field">
+            <span className="field-label">Транспорт</span>
+            <div className="chip-group">
+              {ALL_MODES.map((mode) => (
+                <label className={form.modes.includes(mode) ? "chip active" : "chip"} key={mode}>
+                  <input type="checkbox" checked={form.modes.includes(mode)} onChange={() => onToggleMode(mode)} />
+                  {MODE_LABELS[mode]}
+                </label>
+              ))}
+            </div>
+            <FieldError id="modes-error" message={fieldErrors.modes} />
+          </div>
+        </div>
+
+        {searchError && <div className="inline-error" role="alert">{searchError}</div>}
+
+        <div className="form-actions">
+          <button className="text-button" type="button" onClick={onBack}>Назад</button>
+          <button className="primary-button compact-button" type="submit" disabled={isLoading}>
+            {isLoading ? <><span className="spinner" />Ищем</> : "Найти варианты"}
+          </button>
+        </div>
+      </form>
+    </main>
+  );
+}
+
+function SearchingState({ destination, modes }: { destination: string; modes: TransportMode[] }) {
+  const [activeStep, setActiveStep] = useState(0);
+  const steps = [
+    "Ищем предложения на Туту",
+    "Сверяем время прибытия",
+    "Оставляем варианты до дедлайна",
+  ];
+  const shownModes = modes.length ? modes : ALL_MODES;
+
+  useEffect(() => {
+    const timers = [
+      window.setTimeout(() => setActiveStep(1), 650),
+      window.setTimeout(() => setActiveStep(2), 1_300),
+    ];
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, []);
+
+  return (
+    <section className="searching-card" aria-live="polite" aria-busy="true">
+      <div className="searching-copy">
+        <span className="searching-kicker">Поиск на Туту</span>
+        <h2>Сравниваем способы<br />Направление: {destination}</h2>
+        <p>{steps[activeStep]}</p>
+      </div>
+      <div className="searching-routes" aria-hidden="true">
+        {shownModes.map((mode, index) => (
+          <div className="searching-route" style={{ "--route-delay": `${index * 140}ms` } as CSSProperties} key={mode}>
+            <span>{MODE_ICONS[mode]}</span>
+            <i />
+          </div>
+        ))}
+      </div>
+      <div className="search-progress" aria-label={`${steps[activeStep]}, шаг ${activeStep + 1} из ${steps.length}`}>
+        <div className="search-progress-track"><i style={{ width: `${[34, 68, 100][activeStep]}%` }} /></div>
+        <small>{activeStep + 1} из {steps.length}</small>
+      </div>
     </section>
   );
 }
 
-function Support({ response }: { response: SearchResponse }) {
+function BudgetInput({ value, error, onChange }: { value: string; error?: string; onChange: (value: string) => void }) {
+  const [isFocused, setIsFocused] = useState(false);
+  const formatted = value
+    ? new Intl.NumberFormat("ru-RU").format(Number(value)).replace(/\s/g, " ")
+    : "";
+
   return (
-    <section className="support-section" aria-labelledby="support-title">
-      <div className="support-intro">
-        <p className="step-label">Параллельно</p>
-        <h2 id="support-title">Разберитесь с исходным билетом</h2>
-        <p>Проверенные контакты и спокойный план первых действий. Без догадок о компенсациях и юридических обещаний.</p>
+    <label className="field budget-field" htmlFor="budget">
+      <span className="field-label">Бюджет</span>
+      <div className="budget-control">
+        <input
+          id="budget"
+          className="budget-input"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="Без ограничений"
+          value={isFocused ? value : formatted}
+          aria-invalid={Boolean(error)}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          onChange={(event) => onChange(event.target.value.replace(/\D/g, "").slice(0, 9))}
+        />
+        <span aria-hidden="true">₽</span>
+      </div>
+      <FieldError id="budget-error" message={error} />
+    </label>
+  );
+}
+
+function TripSummary({ place, form, onEdit }: { place: PlaceOption; form: FormState; onEdit?: () => void }) {
+  return (
+    <section className="trip-summary" aria-label="Введённые данные">
+      <div className="summary-route">
+        <div><span>Откуда</span><strong>{place.name}</strong></div>
+        <div className="summary-arrow" aria-hidden="true">→</div>
+        <div><span>Куда</span><strong>{form.destinationCity}</strong></div>
+      </div>
+      <div className="summary-deadline"><span>Дедлайн</span><strong>{formatDateTime(form.arrivalDeadline)}</strong></div>
+      {onEdit && <button type="button" onClick={onEdit}>Изменить</button>}
+    </section>
+  );
+}
+
+function Field({
+  label,
+  error,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  error?: string;
+  htmlFor: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="field" htmlFor={htmlFor}>
+      <span className="field-label">{label}</span>
+      {children}
+      <FieldError id={`${htmlFor}-error`} message={error} />
+    </label>
+  );
+}
+
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return <span className="field-error" id={id}>{message}</span>;
+}
+
+function ResultsScreen({
+  response,
+  form,
+  place,
+  onEditRoute,
+  onEditPreferences,
+}: {
+  response: SearchResponse;
+  form: FormState;
+  place: PlaceOption;
+  onEditRoute: () => void;
+  onEditPreferences: () => void;
+}) {
+  return (
+    <main className="flow-screen results-screen">
+      <div className="result-controls">
+        <button className="back-button" type="button" onClick={onEditPreferences}>← Изменить параметры</button>
+        <button className="text-button" type="button" onClick={onEditRoute}>Изменить маршрут</button>
+      </div>
+      <TripSummary place={place} form={form} />
+
+      <div className="results-heading">
+        <div><h1>{response.options.length ? "Вы успеваете" : "До дедлайна не успеем"}</h1></div>
       </div>
 
-      <div className="support-content">
-        {response.support.contacts.length > 0 && (
-          <div className="contact-list">
-            {response.support.contacts.map((contact) => (
-              <article className="contact-card" key={contact.id}>
-                <div>
-                  <span className="contact-type">{CONTACT_LABELS[contact.type]}</span>
-                  <h3>{contact.name}</h3>
-                  <p>{contact.description}</p>
-                </div>
-                {contact.phone && <a className="phone" href={`tel:${contact.phone.replace(/[^+\d]/g, "")}`}>{contact.phone}</a>}
-                <div className="contact-links">
-                  {contact.supportUrl && <a href={contact.supportUrl} target="_blank" rel="noreferrer">Помощь ↗</a>}
-                  <a href={contact.sourceUrl} target="_blank" rel="noreferrer">Официальный источник ↗</a>
-                </div>
-              </article>
+      {response.options.length > 0 ? (
+        <div className="result-list">
+          {response.options.map((option, index) => (
+            <ResultCard option={option} currentPlaceId={place.id} index={index} key={option.id} />
+          ))}
+        </div>
+      ) : (
+        <EmptyState response={response} form={form} place={place} onEdit={onEditPreferences} />
+      )}
+    </main>
+  );
+}
+
+function ResultCard({
+  option,
+  currentPlaceId,
+  index,
+}: {
+  option: RescueOption;
+  currentPlaceId: string;
+  index: number;
+}) {
+  const smallMargin = option.deadlineMarginMinutes <= 60;
+  const startsElsewhere = option.segments[0]?.fromPlaceId !== currentPlaceId;
+  const travelDurationMinutes = Math.max(
+    0,
+    Math.round((Date.parse(option.arrivalAt) - Date.parse(option.departureAt)) / 60_000),
+  );
+  const transport = Array.from(new Set(option.segments.map((segment) => MODE_LABELS[segment.mode]))).join(" + ");
+  const route = option.segments.map((segment) => `${segment.fromStation} → ${segment.toStation}`).join(" · ");
+  const operators = Array.from(new Set(option.segments.map((segment) =>
+    [segment.vehicleName || segment.carrier, segment.voyageNumber].filter(Boolean).join(" "),
+  ))).join(" · ");
+  const fareDetails = [
+    option.fareName,
+    option.luggageSummary,
+    option.seatsLeft ? `Мест: ${option.seatsLeft}` : undefined,
+  ].filter(Boolean).join(" · ");
+  const transferLabel = option.transferCount === 0
+    ? "Без пересадок"
+    : `${option.transferCount} ${option.transferCount === 1 ? "пересадка" : "пересадки"}`;
+
+  return (
+    <article
+      className={`result-card${smallMargin ? " result-card-risk" : ""}`}
+      style={{ animationDelay: `${index * 110}ms` }}
+    >
+      <div className="result-card-top">
+        <span className="result-transport-icon" aria-hidden="true">{MODE_ICONS[option.segments[0]?.mode ?? "plane"]}</span>
+        <span className="result-category">{CATEGORY_LABELS[option.category]}</span>
+        <span className="transport-label">{transport}</span>
+        <small className="result-operator">{operators}</small>
+      </div>
+
+      <div className="result-timeline">
+        <div><time>{formatTime(option.departureAt)}</time><small>{formatDay(option.departureAt)}</small><span>{option.segments[0]?.fromStation}</span></div>
+        <div className="timeline-line"><span aria-label="Продолжительность пути">{formatDuration(travelDurationMinutes)}</span><i /><b>{transferLabel}</b></div>
+        <div><time>{formatTime(option.arrivalAt)}</time><small>{formatDay(option.arrivalAt)}</small><span>{option.segments.at(-1)?.toStation}</span></div>
+      </div>
+
+      <div className="result-metrics">
+        <div><span>Прибытие</span><strong>{formatDateTime(option.arrivalAt)}</strong></div>
+        <div className={smallMargin ? "metric-risk" : ""}><span>Запас до дедлайна</span><strong>{formatDuration(option.deadlineMarginMinutes)}</strong></div>
+      </div>
+
+      <p className="route-description">{route}</p>
+      {fareDetails && <p className="fare-copy">▣ {fareDetails}</p>}
+
+      <div className="result-buy">
+        <div><span>{option.priceIsFrom ? "Цена от" : "Цена"}</span><strong>{option.totalPrice > 0 ? formatMoney(option.totalPrice, option.currency) : "Уточняется"}</strong></div>
+        <TicketButton option={option} />
+      </div>
+
+      <div className="result-warnings">
+        {startsElsewhere && <p><strong>Отправление из другой точки:</strong> {option.segments[0]?.fromStation}. Дорога до неё не учтена</p>}
+        <p>Перед покупкой проверьте расписание и наличие мест</p>
+      </div>
+    </article>
+  );
+}
+
+function TicketButton({ option }: { option: RescueOption }) {
+  const [isOpening, setIsOpening] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  if (option.checkoutRef) {
+    const openCheckout = async () => {
+      setCheckoutError(null);
+      const checkoutWindow = window.open("about:blank", "_blank");
+      if (!checkoutWindow) {
+        setCheckoutError("Разрешите открытие новой вкладки");
+        return;
+      }
+
+      checkoutWindow.opener = null;
+      checkoutWindow.document.title = "Открываем Туту";
+      checkoutWindow.document.body.textContent = "Открываем билет на Туту…";
+      checkoutWindow.document.body.style.cssText = "margin:0;min-height:100vh;display:grid;place-items:center;font:600 18px system-ui;color:#14213d;background:#f5f7fb";
+      setIsOpening(true);
+
+      try {
+        const response = await fetch(apiUrl("/api/checkout"), {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ checkoutRef: option.checkoutRef }),
+        });
+        const payload = await response.json().catch(() => null) as { checkoutUrl?: string; error?: string } | null;
+        if (!response.ok || !payload?.checkoutUrl) {
+          throw new Error(payload?.error || "Не удалось получить ссылку на билет");
+        }
+        checkoutWindow.location.replace(payload.checkoutUrl);
+      } catch (error) {
+        if (option.bookingUrl) {
+          checkoutWindow.location.replace(option.bookingUrl);
+        } else {
+          checkoutWindow.close();
+          setCheckoutError(error instanceof Error ? error.message : "Не удалось открыть билет");
+        }
+      } finally {
+        setIsOpening(false);
+      }
+    };
+
+    return (
+      <div className="ticket-action">
+        <button className="primary-button ticket-button" type="button" disabled={isOpening} onClick={openCheckout}>
+          {isOpening ? "Открываем" : "Перейти"}
+        </button>
+        {checkoutError && <small className="checkout-error" role="alert">{checkoutError}</small>}
+      </div>
+    );
+  }
+
+  if (option.bookingUrl) {
+    return <a className="primary-button ticket-button" href={option.bookingUrl} target="_blank" rel="noreferrer">Перейти</a>;
+  }
+
+  return <span className="ticket-unavailable">Ссылка недоступна</span>;
+}
+
+function EmptyState({
+  response,
+  form,
+  place,
+  onEdit,
+}: {
+  response: SearchResponse;
+  form: FormState;
+  place: PlaceOption;
+  onEdit: () => void;
+}) {
+  return (
+    <div className="empty-state">
+      <div className="empty-main">
+        <span className="empty-icon" aria-hidden="true">×</span>
+        <h2>Успеть не получится</h2>
+        <p>Не нашли билетов из точки «{place.name}» в город «{form.destinationCity}» до {formatDateTime(form.arrivalDeadline)}</p>
+        <button className="secondary-button" type="button" onClick={onEdit}>Изменить параметры</button>
+      </div>
+
+      {response.nearestAfterDeadline && (
+        <div className="late-option">
+          <span>Ближайший после дедлайна</span>
+          <strong>{formatTime(response.nearestAfterDeadline.departureAt)} → {formatTime(response.nearestAfterDeadline.arrivalAt)}</strong>
+          <p>{response.nearestAfterDeadline.segments[0]?.fromStation} → {response.nearestAfterDeadline.segments.at(-1)?.toStation}</p>
+          <b>Опоздает на {formatDuration(response.nearestAfterDeadline.missedDeadlineByMinutes)}</b>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SupportScreen({
+  form,
+  place,
+  support,
+  supportError,
+  isLoading,
+  onField,
+  onSubmit,
+}: {
+  form: FormState;
+  place?: PlaceOption;
+  support: SearchResponse["support"] | null;
+  supportError: string | null;
+  isLoading: boolean;
+  onField: <Key extends keyof FormState>(key: Key, value: FormState[Key]) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  useEffect(() => {
+    if (place) trackSupportEvent("support_block_viewed", { locationId: place.id });
+  }, [place]);
+
+  return (
+    <main className="flow-screen support-screen">
+      <section className="page-heading compact-heading">
+        <h1>Помощь с рейсом</h1>
+        <p>Укажите, где вы сейчас, авиакомпанию и продавца — соберём контакты и короткий план действий</p>
+      </section>
+
+      <form className="panel support-form" onSubmit={onSubmit}>
+        <div className="support-form-grid">
+          <SearchablePlace
+            value={form.placeQuery}
+            selectedId={form.placeId}
+            onQueryChange={(value) => {
+              onField("placeQuery", value);
+              onField("placeId", "");
+            }}
+            onSelect={(option) => {
+              onField("placeId", option.id);
+              onField("placeQuery", `${option.city}, ${option.name}`);
+            }}
+          />
+          <Field label="Авиакомпания" htmlFor="airline">
+            <select id="airline" value={form.airlineId} onChange={(event) => onField("airlineId", event.target.value)}>
+              <option value="">Не знаю</option>
+              {AIRLINE_OPTIONS.map((option) => <option value={option.id} key={option.id}>{option.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Где куплен билет" htmlFor="seller">
+            <select id="seller" value={form.sellerId} onChange={(event) => onField("sellerId", event.target.value)}>
+              <option value="">Не помню</option>
+              {SELLER_OPTIONS.map((option) => <option value={option.id} key={option.id}>{option.name}</option>)}
+            </select>
+          </Field>
+        </div>
+
+        {supportError && <div className="inline-error" role="alert">{supportError}</div>}
+        <div className="form-actions support-actions">
+          <button className="primary-button compact-button" type="submit" disabled={isLoading}>{isLoading ? "Проверяем" : "Показать план"}</button>
+        </div>
+      </form>
+
+      {support && (
+        <div className="support-results" aria-live="polite">
+          <section className="support-actions-panel" aria-labelledby="support-actions-title">
+            <div className="support-results-heading">
+              <div><h2 id="support-actions-title">Ваш план действий</h2>{support.departureTime && <p>Исходный вылет: <strong>{support.departureTime}</strong></p>}</div>
+            </div>
+            <div className="support-prep">
+              <strong>Подготовьте перед обращением</strong>
+              <p>Номер брони или заказа, ФИО пассажира, маршрут и дату, уведомление об отмене или переносе и желаемый вариант: обмен или возврат</p>
+            </div>
+            {support.actions.length > 0 ? (
+              <ol className="support-action-list">
+                {support.actions.map((action, index) => <SupportActionItem action={action} number={index + 1} key={action.id} />)}
+              </ol>
+            ) : (
+              <div className="no-contacts"><p>Проверенных ссылок пока нет</p><span>Уточните авиакомпанию или обратитесь на стойку информации</span></div>
+            )}
+          </section>
+
+          {!form.sellerId && (
+            <p className="seller-hint">Не помните продавца? Проверьте письмо с билетом или приложение, где оформляли заказ</p>
+          )}
+        </div>
+      )}
+    </main>
+  );
+}
+
+function SupportActionItem({ action, number }: { action: SupportAction; number: number }) {
+  return (
+    <li className="support-action-item">
+      <span className="support-action-number">{number}</span>
+      <div className="support-action-copy">
+        <h3>{action.title}</h3>
+        <p>{withoutTerminalPeriod(action.description)}</p>
+        {action.contacts.length > 0 && (
+          <div className="support-contact-list">
+            {action.contacts.map((contact) => (
+              <a href={contact.href} key={`${contact.type}-${contact.value}`}>
+                <span>{contact.label}</span>{contact.value}
+              </a>
             ))}
           </div>
         )}
-
-        <div className="action-plan">
-          <h3>Что сделать сейчас</h3>
-          <ol>
-            {response.support.actionPlan.map((item, index) => (
-              <li key={item}><span>{index + 1}</span><p>{item}</p></li>
-            ))}
-          </ol>
-        </div>
+        {action.contactNote && <small className="support-contact-note">{withoutTerminalPeriod(action.contactNote)}</small>}
       </div>
-    </section>
+      <a
+        className="primary-button support-action-link"
+        href={action.url}
+        target="_blank"
+        rel="noreferrer"
+        onClick={() => trackSupportEvent("support_action_clicked", {
+          action: action.category,
+          entityType: action.entityType,
+          entityId: action.entityId,
+        })}
+      >
+        {action.actionLabel}
+      </a>
+    </li>
   );
 }
