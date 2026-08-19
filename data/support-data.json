@@ -1,0 +1,216 @@
+{
+  "airlines": [
+    {
+      "id": "aeroflot",
+      "type": "airline",
+      "name": "Аэрофлот",
+      "aliases": ["Aeroflot", "SU", "Аэрофлот"],
+      "support": {
+        "main": "https://www.aeroflot.ru/ru-ru/help",
+        "contact": "https://www.aeroflot.ru/ru-ru/help"
+      },
+      "source": { "url": "https://www.aeroflot.ru/ru-ru/help", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "pobeda",
+      "type": "airline",
+      "name": "Победа",
+      "aliases": ["Pobeda", "DP", "Победа"],
+      "support": {
+        "main": "https://www.flypobeda.ru/services",
+        "flightStatus": "https://www.flypobeda.ru/services/online-board",
+        "contact": "https://www.flypobeda.ru/information/contacts"
+      },
+      "source": { "url": "https://www.flypobeda.ru/information/contacts", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "s7",
+      "type": "airline",
+      "name": "S7 Airlines",
+      "aliases": ["S7", "Siberia", "Сибирь"],
+      "support": {
+        "main": "https://www.s7.ru/",
+        "contact": "https://www.s7.ru/ru/about/contactus/"
+      },
+      "source": { "url": "https://smarthelp.s7.ru/anonymous/new", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "ural",
+      "type": "airline",
+      "name": "Уральские авиалинии",
+      "aliases": ["Ural Airlines", "U6", "Уральские авиалинии"],
+      "support": { "main": "https://www.uralairlines.ru/" },
+      "source": { "url": "https://www.uralairlines.ru/", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "nordwind",
+      "type": "airline",
+      "name": "Nordwind Airlines",
+      "aliases": ["Nordwind", "N4", "Северный ветер"],
+      "support": {
+        "main": "https://nordwindairlines.ru/",
+        "contact": "https://nordwindairlines.ru/ru/contacts"
+      },
+      "source": { "url": "https://nordwindairlines.ru/ru/contacts", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "rossiya",
+      "type": "airline",
+      "name": "Россия",
+      "aliases": ["Rossiya", "FV", "Россия"],
+      "support": {
+        "main": "https://www.rossiya-airlines.ru/",
+        "flightStatus": "https://www.rossiya-airlines.ru/onlineboard/onlineboard/departures_board/?lang=ru"
+      },
+      "source": { "url": "https://www.rossiya-airlines.ru/onlineboard/onlineboard/departures_board/?lang=ru", "verifiedAt": "2026-08-19" }
+    }
+  ],
+  "sellers": [
+    {
+      "id": "tutu",
+      "type": "seller",
+      "name": "Туту",
+      "aliases": ["Tutu", "Туту", "tutu.ru"],
+      "support": {
+        "main": "https://www.tutu.ru/feedback.php",
+        "orders": "https://www.tutu.ru/feedback.php",
+        "contact": "https://www.tutu.ru/feedback.php"
+      },
+      "source": { "url": "https://www.tutu.ru/feedback.php", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "aviasales",
+      "type": "seller",
+      "name": "Авиасейлс",
+      "aliases": ["Aviasales", "Авиасейлс"],
+      "support": { "main": "https://www.aviasales.ru/faq?language=ru", "contact": "https://www.aviasales.ru/about/contacts" },
+      "source": { "url": "https://www.aviasales.ru/about/contacts", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "yandex-travel",
+      "type": "seller",
+      "name": "Яндекс Путешествия",
+      "aliases": ["Yandex Travel", "Яндекс Путешествия"],
+      "support": { "main": "https://yandex.ru/support/travel/ru/troubleshooting", "contact": "https://yandex.ru/support/travel/ru/troubleshooting" },
+      "source": { "url": "https://yandex.ru/support/travel/ru/troubleshooting", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "ozon-travel",
+      "type": "seller",
+      "name": "Ozon Travel",
+      "aliases": ["Ozon", "Ozon Travel", "Озон"],
+      "support": { "main": "https://www.ozon.ru/travel/mergeInitialisation/" },
+      "source": { "url": "https://www.ozon.ru/travel/mergeInitialisation/", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "onetwotrip",
+      "type": "seller",
+      "name": "OneTwoTrip",
+      "aliases": ["OneTwoTrip", "OTT"],
+      "support": { "main": "https://support.onetwotrip.com/hc/", "contact": "https://support.onetwotrip.com/hc/" },
+      "source": { "url": "https://support.onetwotrip.com/hc/", "verifiedAt": "2026-08-19" }
+    }
+  ],
+  "locations": [
+    {
+      "id": "pulkovo",
+      "type": "airport",
+      "name": "Пулково",
+      "city": "Санкт-Петербург",
+      "code": "LED",
+      "aliases": ["LED", "Пулково", "Pulkovo", "Санкт-Петербург"],
+      "support": { "main": "https://pulkovoairport.ru/passengers/", "departures": "https://pulkovoairport.ru/passengers/" },
+      "source": { "url": "https://pulkovoairport.ru/passengers/", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "sheremetyevo",
+      "type": "airport",
+      "name": "Шереметьево",
+      "city": "Москва",
+      "code": "SVO",
+      "aliases": ["SVO", "Шереметьево", "Москва"],
+      "support": { "main": "https://www.svo.aero/ru/", "departures": "https://www.svo.aero/ru/timetable/today/" },
+      "source": { "url": "https://www.svo.aero/ru/", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "domodedovo",
+      "type": "airport",
+      "name": "Домодедово",
+      "city": "Москва",
+      "code": "DME",
+      "aliases": ["DME", "Домодедово", "Москва"],
+      "support": { "main": "https://m.dme.ru/", "departures": "https://m.dme.ru/" },
+      "source": { "url": "https://m.dme.ru/", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "vnukovo",
+      "type": "airport",
+      "name": "Внуково",
+      "city": "Москва",
+      "code": "VKO",
+      "aliases": ["VKO", "Внуково", "Москва"],
+      "support": { "main": "https://www.vnukovo.ru/ru/" },
+      "source": { "url": "https://www.vnukovo.ru/ru/", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "sochi-airport",
+      "type": "airport",
+      "name": "Аэропорт Сочи",
+      "city": "Сочи",
+      "code": "AER",
+      "aliases": ["AER", "Адлер", "Сочи"],
+      "support": { "main": "https://aer.aero/" },
+      "source": { "url": "https://aer.aero/", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "kazan-airport",
+      "type": "airport",
+      "name": "Аэропорт Казань",
+      "city": "Казань",
+      "code": "KZN",
+      "aliases": ["KZN", "Казань"],
+      "support": { "main": "https://kazan.aero/" },
+      "source": { "url": "https://kazan.aero/", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "tolmachevo",
+      "type": "airport",
+      "name": "Толмачёво",
+      "city": "Новосибирск",
+      "code": "OVB",
+      "aliases": ["OVB", "Толмачево", "Новосибирск"],
+      "support": { "main": "https://tolmachevo.ru/" },
+      "source": { "url": "https://tolmachevo.ru/", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "koltsovo",
+      "type": "airport",
+      "name": "Кольцово",
+      "city": "Екатеринбург",
+      "code": "SVX",
+      "aliases": ["SVX", "Кольцово", "Екатеринбург"],
+      "support": { "main": "https://svx.aero/" },
+      "source": { "url": "https://svx.aero/", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "khrabrovo",
+      "type": "airport",
+      "name": "Храброво",
+      "city": "Калининград",
+      "code": "KGD",
+      "aliases": ["KGD", "Храброво", "Калининград"],
+      "support": { "main": "https://kgd.aero/" },
+      "source": { "url": "https://kgd.aero/", "verifiedAt": "2026-08-19" }
+    },
+    {
+      "id": "moskovsky-station",
+      "type": "railway_station",
+      "name": "Московский вокзал",
+      "city": "Санкт-Петербург",
+      "code": "",
+      "aliases": ["Московский вокзал", "Санкт-Петербург Главный"],
+      "support": { "main": "https://www.rzd.ru/" },
+      "source": { "url": "https://www.rzd.ru/", "verifiedAt": "2026-08-19" }
+    }
+  ]
+}

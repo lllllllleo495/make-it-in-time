@@ -1,25 +1,34 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import supportData from "../data/support-data.json";
 import type {
   RescueOption,
   RescueSearchRequest,
   ResultCategory,
   SearchResponse,
+  SupportAction,
   TransportMode,
 } from "../lib/domain";
 
 type Screen = "route" | "preferences" | "results" | "support";
 type PlaceOption = RescueSearchRequest["incident"]["currentPlace"];
+type PlaceSearchOption = PlaceOption & { code: string; aliases: string[] };
 type Baggage = "none" | "carry_on" | "checked";
 type FieldErrors = Partial<Record<keyof FormState, string>>;
 
-const PLACE_OPTIONS: PlaceOption[] = [
-  { id: "pulkovo", name: "Пулково", city: "Санкт-Петербург", type: "airport" },
-  { id: "sochi-airport", name: "Аэропорт Сочи", city: "Сочи", type: "airport" },
-  { id: "sheremetyevo", name: "Шереметьево", city: "Москва", type: "airport" },
-  { id: "moskovsky-station", name: "Московский вокзал", city: "Санкт-Петербург", type: "station" },
-];
+const PLACE_OPTIONS: PlaceSearchOption[] = supportData.locations.map((location) => ({
+  id: location.id,
+  name: location.name,
+  city: location.city,
+  type: location.type === "airport" ? "airport" : "station",
+  code: location.code,
+  aliases: location.aliases,
+}));
+
+const AIRLINE_OPTIONS = supportData.airlines.map(({ id, name }) => ({ id, name }));
+const SELLER_OPTIONS = supportData.sellers.map(({ id, name }) => ({ id, name }));
+const CITY_OPTIONS = Array.from(new Set(PLACE_OPTIONS.map((place) => place.city)));
 
 const ALL_MODES: TransportMode[] = ["plane", "train", "bus", "suburban"];
 
@@ -36,17 +45,9 @@ const CATEGORY_LABELS: Record<ResultCategory, string> = {
   fewest_transfers: "Меньше пересадок",
 };
 
-const CONTACT_LABELS = {
-  airline: "Авиакомпания",
-  airport: "Аэропорт",
-  seller: "Продавец билета",
-};
-
 type FormState = {
   placeId: string;
-  customPlaceName: string;
-  customPlaceCity: string;
-  customPlaceType: "airport" | "station";
+  placeQuery: string;
   destinationCity: string;
   arrivalDeadline: string;
   passengers: number;
@@ -54,16 +55,14 @@ type FormState = {
   modes: TransportMode[];
   maxPrice: string;
   disruptionType: "cancelled" | "delayed";
-  flightNumber: string;
+  departureTime: string;
   airlineId: string;
   sellerId: string;
 };
 
 const EMPTY_FORM: FormState = {
   placeId: "",
-  customPlaceName: "",
-  customPlaceCity: "",
-  customPlaceType: "airport",
+  placeQuery: "",
   destinationCity: "",
   arrivalDeadline: "",
   passengers: 1,
@@ -71,16 +70,14 @@ const EMPTY_FORM: FormState = {
   modes: ALL_MODES,
   maxPrice: "",
   disruptionType: "delayed",
-  flightNumber: "",
+  departureTime: "",
   airlineId: "",
   sellerId: "",
 };
 
 const SEARCH_FIELDS = new Set<keyof FormState>([
   "placeId",
-  "customPlaceName",
-  "customPlaceCity",
-  "customPlaceType",
+  "placeQuery",
   "destinationCity",
   "arrivalDeadline",
   "passengers",
@@ -88,6 +85,17 @@ const SEARCH_FIELDS = new Set<keyof FormState>([
   "modes",
   "maxPrice",
 ]);
+const SUPPORT_FIELDS = new Set<keyof FormState>([
+  "disruptionType",
+  "departureTime",
+  "airlineId",
+  "sellerId",
+]);
+
+function trackSupportEvent(event: string, params: Record<string, string> = {}) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("uspet:analytics", { detail: { event, ...params } }));
+}
 
 function toIso(value: string, label: string) {
   const date = new Date(value);
@@ -124,30 +132,31 @@ function formatMoney(value: number) {
   return `${new Intl.NumberFormat("ru-RU").format(value)} ₽`;
 }
 
+function formatPassengerCount(value: number) {
+  if (value === 1) return "1 пассажир";
+  if (value >= 2 && value <= 4) return `${value} пассажира`;
+  return `${value} пассажиров`;
+}
+
 function getPlace(form: FormState): PlaceOption | undefined {
-  if (form.placeId === "custom") {
-    if (!form.customPlaceName.trim() || !form.customPlaceCity.trim()) return undefined;
+  const selected = PLACE_OPTIONS.find((option) => option.id === form.placeId);
+  if (selected) return selected;
+  if (form.placeQuery.trim().length >= 2) {
     return {
-      id: `custom-${form.customPlaceType}`,
-      name: form.customPlaceName.trim(),
-      city: form.customPlaceCity.trim(),
-      type: form.customPlaceType,
+      id: "custom-location",
+      name: form.placeQuery.trim(),
+      city: form.placeQuery.trim(),
+      type: "airport",
     };
   }
-  return PLACE_OPTIONS.find((option) => option.id === form.placeId);
+  return undefined;
 }
 
 function validateRoute(form: FormState) {
   const errors: FieldErrors = {};
   const place = getPlace(form);
 
-  if (!form.placeId) errors.placeId = "Выберите аэропорт или вокзал";
-  if (form.placeId === "custom" && !form.customPlaceName.trim()) {
-    errors.customPlaceName = "Укажите название точки";
-  }
-  if (form.placeId === "custom" && !form.customPlaceCity.trim()) {
-    errors.customPlaceCity = "Укажите город";
-  }
+  if (!place) errors.placeQuery = "Введите город, аэропорт или вокзал";
   if (!form.destinationCity.trim()) {
     errors.destinationCity = "Укажите город назначения";
   }
@@ -167,8 +176,8 @@ function validatePreferences(form: FormState) {
   if (!Number.isInteger(form.passengers) || form.passengers < 1 || form.passengers > 9) {
     errors.passengers = "От 1 до 9 пассажиров";
   }
-  if (form.maxPrice && Number(form.maxPrice) <= 0) {
-    errors.maxPrice = "Укажите сумму больше нуля";
+  if (form.maxPrice && Number(form.maxPrice) < 500) {
+    errors.maxPrice = "Минимальный бюджет — 500 ₽";
   }
   if (!form.modes.length) {
     errors.modes = "Выберите хотя бы один вид транспорта";
@@ -223,6 +232,9 @@ export function RescueApp() {
     setSupportError(null);
     if (SEARCH_FIELDS.has(key)) {
       setResult(null);
+    }
+    if (SUPPORT_FIELDS.has(key)) {
+      setSupport(null);
     }
   }
 
@@ -298,7 +310,7 @@ export function RescueApp() {
         body: JSON.stringify({
           currentPlaceId: place.id,
           disruptionType: form.disruptionType,
-          flightNumber: form.flightNumber.trim() || undefined,
+          departureTime: form.departureTime || undefined,
           airlineId: form.airlineId || undefined,
           sellerId: form.sellerId || undefined,
         }),
@@ -306,6 +318,12 @@ export function RescueApp() {
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error || "Не удалось загрузить контакты");
       setSupport(payload as SearchResponse["support"]);
+      for (const miss of payload?.misses ?? []) {
+        trackSupportEvent("support_directory_miss", {
+          entityType: miss.entityType,
+          entityId: miss.entityId,
+        });
+      }
     } catch (caught) {
       setSupportError(caught instanceof Error ? caught.message : "Не удалось загрузить контакты");
     } finally {
@@ -403,7 +421,6 @@ function AppHeader({
           <span className="brand-mark" aria-hidden="true">У</span>
           <span>Успеть</span>
         </button>
-        <span className="header-promise">Все идет по плану?</span>
         <nav className="step-nav" aria-label="Этапы">
           {steps.map((step, index) => {
             const canOpen = step.id === "route" || (step.id === "preferences" && canOpenPreferences) || (step.id === "results" && hasResults) || (step.id === "support" && hasResults);
@@ -440,26 +457,25 @@ function RouteScreen({
   return (
     <main className="flow-screen route-screen">
       <section className="page-heading">
-        <h1>Куда нужно успеть?</h1>
-        <p>Укажите три вещи — детали поездки спросим дальше.</p>
+        <h1>Поможем успеть</h1>
+        <p>Укажите важное — детали уточним далее.</p>
       </section>
 
       <form id="route-form" className="panel route-form" onSubmit={onSubmit} noValidate>
         <div className="route-fields">
-          <Field label="Где вы сейчас" error={fieldErrors.placeId} htmlFor="place">
-            <select
-              id="place"
-              value={form.placeId}
-              aria-invalid={Boolean(fieldErrors.placeId)}
-              onChange={(event) => onField("placeId", event.target.value)}
-            >
-              <option value="">Аэропорт или вокзал</option>
-              {PLACE_OPTIONS.map((option) => (
-                <option value={option.id} key={option.id}>{option.name}, {option.city}</option>
-              ))}
-              <option value="custom">Другая точка…</option>
-            </select>
-          </Field>
+          <SearchablePlace
+            value={form.placeQuery}
+            selectedId={form.placeId}
+            error={fieldErrors.placeQuery}
+            onQueryChange={(value) => {
+              onField("placeQuery", value);
+              onField("placeId", "");
+            }}
+            onSelect={(option) => {
+              onField("placeId", option.id);
+              onField("placeQuery", `${option.city}, ${option.name}`);
+            }}
+          />
 
           <Field label="Куда нужно попасть" error={fieldErrors.destinationCity} htmlFor="destination">
             <input
@@ -471,7 +487,7 @@ function RouteScreen({
               aria-invalid={Boolean(fieldErrors.destinationCity)}
               onChange={(event) => onField("destinationCity", event.target.value)}
             />
-            <datalist id="cities"><option value="Москва" /><option value="Санкт-Петербург" /><option value="Сочи" /><option value="Казань" /></datalist>
+            <datalist id="cities">{CITY_OPTIONS.map((city) => <option value={city} key={city} />)}</datalist>
           </Field>
 
           <Field label="Быть на месте не позже" error={fieldErrors.arrivalDeadline} htmlFor="deadline">
@@ -485,23 +501,91 @@ function RouteScreen({
           </Field>
         </div>
 
-        {form.placeId === "custom" && (
-          <div className="custom-place-fields">
-            <Field label="Название точки" error={fieldErrors.customPlaceName} htmlFor="custom-place">
-              <input id="custom-place" value={form.customPlaceName} onChange={(event) => onField("customPlaceName", event.target.value)} />
-            </Field>
-            <Field label="Город" error={fieldErrors.customPlaceCity} htmlFor="custom-city">
-              <input id="custom-city" value={form.customPlaceCity} onChange={(event) => onField("customPlaceCity", event.target.value)} />
-            </Field>
-          </div>
-        )}
-
         <div className="form-actions">
           <span>Шаг 1 из 4</span>
           <button className="primary-button compact-button" type="submit">Продолжить</button>
         </div>
       </form>
     </main>
+  );
+}
+
+function SearchablePlace({
+  value,
+  selectedId,
+  error,
+  onQueryChange,
+  onSelect,
+}: {
+  value: string;
+  selectedId: string;
+  error?: string;
+  onQueryChange: (value: string) => void;
+  onSelect: (option: PlaceSearchOption) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const normalizedQuery = value.trim().toLocaleLowerCase("ru-RU");
+  const filtered = PLACE_OPTIONS.filter((option) => {
+    if (!normalizedQuery) return true;
+    return [option.name, option.city, option.code, ...option.aliases]
+      .join(" ")
+      .toLocaleLowerCase("ru-RU")
+      .includes(normalizedQuery);
+  }).slice(0, 7);
+
+  return (
+    <div className="field place-combobox">
+      <label className="field-label" htmlFor="place-search">Где вы сейчас</label>
+      <input
+        id="place-search"
+        type="text"
+        role="combobox"
+        autoComplete="off"
+        placeholder="Город, аэропорт или вокзал"
+        value={value}
+        aria-expanded={isOpen}
+        aria-controls="place-options"
+        aria-invalid={Boolean(error)}
+        onFocus={() => setIsOpen(true)}
+        onBlur={() => window.setTimeout(() => setIsOpen(false), 120)}
+        onChange={(event) => {
+          onQueryChange(event.target.value);
+          setIsOpen(true);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && isOpen && filtered[0]) {
+            event.preventDefault();
+            onSelect(filtered[0]);
+            setIsOpen(false);
+          }
+        }}
+      />
+      {isOpen && (
+        <div className="place-options" id="place-options" role="listbox">
+          {filtered.length > 0 ? filtered.map((option) => (
+            <button
+              className={selectedId === option.id ? "selected" : ""}
+              type="button"
+              role="option"
+              aria-selected={selectedId === option.id}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                onSelect(option);
+                setIsOpen(false);
+              }}
+              key={option.id}
+            >
+              <span className="place-icon" aria-hidden="true">{option.type === "airport" ? "✈" : "●"}</span>
+              <span><strong>{option.city}</strong><small>{option.name}</small></span>
+              {option.code && <b>{option.code}</b>}
+            </button>
+          )) : (
+            <p>Такой точки нет в справочнике. Можно продолжить со своим названием.</p>
+          )}
+        </div>
+      )}
+      <FieldError id="place-search-error" message={error} />
+    </div>
   );
 }
 
@@ -534,7 +618,7 @@ function PreferencesScreen({
 
       <form id="preferences-form" className="panel preferences-form" onSubmit={onSubmit} noValidate>
         <div className="preference-grid">
-          <div className="field preference-wide">
+          <div className="field baggage-field">
             <span className="field-label">Багаж</span>
             <div className="segmented" role="radiogroup" aria-label="Багаж">
               {([
@@ -550,17 +634,21 @@ function PreferencesScreen({
             </div>
           </div>
 
-          <Field label="Пассажиров" error={fieldErrors.passengers} htmlFor="passengers">
-            <select id="passengers" value={form.passengers} onChange={(event) => onField("passengers", Number(event.target.value))}>
-              {Array.from({ length: 9 }, (_, index) => index + 1).map((value) => <option value={value} key={value}>{value}</option>)}
-            </select>
-          </Field>
+          <div className="field passengers-field">
+            <span className="field-label">Пассажиры</span>
+            <div className="passenger-counter" role="group" aria-label="Количество пассажиров">
+              <button type="button" aria-label="Уменьшить количество пассажиров" disabled={form.passengers <= 1} onClick={() => onField("passengers", form.passengers - 1)}>−</button>
+              <strong aria-live="polite">{formatPassengerCount(form.passengers)}</strong>
+              <button type="button" aria-label="Увеличить количество пассажиров" disabled={form.passengers >= 9} onClick={() => onField("passengers", form.passengers + 1)}>+</button>
+            </div>
+            <FieldError id="passengers-error" message={fieldErrors.passengers} />
+          </div>
 
           <Field label="Бюджет на всех" error={fieldErrors.maxPrice} htmlFor="budget">
-            <div className="input-suffix"><input id="budget" type="number" min="1" placeholder="Без ограничений" value={form.maxPrice} onChange={(event) => onField("maxPrice", event.target.value)} /><b>₽</b></div>
+            <div className="input-suffix"><input id="budget" type="number" min="500" step="500" placeholder="Без ограничений" value={form.maxPrice} onChange={(event) => onField("maxPrice", event.target.value)} /><b>₽</b></div>
           </Field>
 
-          <div className="field preference-wide">
+          <div className="field transport-field">
             <span className="field-label">Транспорт</span>
             <div className="chip-group">
               {ALL_MODES.map((mode) => (
@@ -590,10 +678,12 @@ function PreferencesScreen({
 function TripSummary({ place, form, onEdit }: { place: PlaceOption; form: FormState; onEdit?: () => void }) {
   return (
     <section className="trip-summary" aria-label="Введённые данные">
-      <div><span>Откуда</span><strong>{place.name}</strong></div>
-      <div className="summary-arrow" aria-hidden="true">→</div>
-      <div><span>Куда</span><strong>{form.destinationCity}</strong></div>
-      <div><span>Дедлайн</span><strong>{formatDateTime(form.arrivalDeadline)}</strong></div>
+      <div className="summary-route">
+        <div><span>Откуда</span><strong>{place.name}</strong></div>
+        <div className="summary-arrow" aria-hidden="true">→</div>
+        <div><span>Куда</span><strong>{form.destinationCity}</strong></div>
+      </div>
+      <div className="summary-deadline"><span>Дедлайн</span><strong>{formatDateTime(form.arrivalDeadline)}</strong></div>
       {onEdit && <button type="button" onClick={onEdit}>Изменить</button>}
     </section>
   );
@@ -648,7 +738,7 @@ function ResultsScreen({
       <TripSummary place={place} form={form} />
 
       <div className="results-heading">
-        <div><h1>{response.options.length ? "Вот как можно успеть" : "До дедлайна вариантов нет"}</h1><p>{response.options.length ? "Показываем только билеты, которые прибывают вовремя." : "Не будем предлагать маршрут, с которым вы опоздаете."}</p></div>
+        <div><h1>{response.options.length ? "Вот как можно успеть" : "До дедлайна не успеем"}</h1>{response.options.length > 0 && <p>Показываем только билеты, которые прибывают вовремя.</p>}</div>
         {response.options.length > 0 && <span>{response.options.length} {response.options.length === 1 ? "вариант" : "варианта"}</span>}
       </div>
 
@@ -768,12 +858,16 @@ function SupportScreen({
   onBack: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  useEffect(() => {
+    trackSupportEvent("support_block_viewed", { locationId: place.id });
+  }, [place.id]);
+
   return (
     <main className="flow-screen support-screen">
       <button className="back-button" type="button" onClick={onBack}>← Вернуться к вариантам</button>
       <section className="page-heading compact-heading">
-        <h1>Помощь с рейсом</h1>
-        <p>Расскажите, что случилось, — покажем контакты и первые шаги.</p>
+        <h1>Что делать с исходным рейсом?</h1>
+        <p>Если что-то пошло не по плану, расскажите, что знаете. Покажем понятные действия и официальные ссылки.</p>
       </section>
 
       <form className="panel support-form" onSubmit={onSubmit}>
@@ -787,52 +881,81 @@ function SupportScreen({
           </div>
 
           <Field label="Авиакомпания" htmlFor="airline">
-            <select id="airline" value={form.airlineId} onChange={(event) => onField("airlineId", event.target.value)}><option value="">Не знаю</option><option value="aeroflot">Аэрофлот</option></select>
+            <select id="airline" value={form.airlineId} onChange={(event) => onField("airlineId", event.target.value)}>
+              <option value="">Не знаю</option>
+              {AIRLINE_OPTIONS.map((option) => <option value={option.id} key={option.id}>{option.name}</option>)}
+            </select>
           </Field>
           <Field label="Где куплен билет" htmlFor="seller">
-            <select id="seller" value={form.sellerId} onChange={(event) => onField("sellerId", event.target.value)}><option value="">Не знаю</option><option value="tutu">Туту</option></select>
+            <select id="seller" value={form.sellerId} onChange={(event) => onField("sellerId", event.target.value)}>
+              <option value="">Не помню</option>
+              {SELLER_OPTIONS.map((option) => <option value={option.id} key={option.id}>{option.name}</option>)}
+            </select>
           </Field>
-          <Field label="Номер рейса" htmlFor="flight-number">
-            <input id="flight-number" placeholder="Например, SU 15" value={form.flightNumber} onChange={(event) => onField("flightNumber", event.target.value)} />
+          <Field label="Исходный вылет · необязательно" htmlFor="departure-time">
+            <input id="departure-time" type="time" value={form.departureTime} onChange={(event) => onField("departureTime", event.target.value)} />
           </Field>
-          <div className="support-place"><span>Вы сейчас</span><strong>{place.name}</strong></div>
+          <div className="support-place"><span>Где вы сейчас</span><strong>{place.city}, {place.name}</strong></div>
         </div>
 
         {supportError && <div className="inline-error" role="alert">{supportError}</div>}
         <div className="form-actions support-actions">
-          <span>Не знаете данные? Покажем то, что уже известно.</span>
-          <button className="primary-button compact-button" type="submit" disabled={isLoading}>{isLoading ? "Загружаем" : "Что делать"}</button>
+          <span>Можно не знать продавца и время — это не заблокирует помощь.</span>
+          <button className="primary-button compact-button" type="submit" disabled={isLoading}>{isLoading ? "Проверяем" : "Получить инструкцию"}</button>
         </div>
       </form>
 
       {support && (
         <div className="support-results" aria-live="polite">
-          <section className="contacts-panel" aria-labelledby="contacts-title">
-            <h2 id="contacts-title">Кому обратиться</h2>
-            {support.contacts.length > 0 ? (
-              <div className="contact-list">
-                {support.contacts.map((contact) => (
-                  <article className="contact-card" key={contact.id}>
-                    <div><span className="contact-type">{CONTACT_LABELS[contact.type]}</span><h3>{contact.name}</h3><p>{contact.description}</p></div>
-                    {contact.phone && <a className="phone" href={`tel:${contact.phone.replace(/[^+\d]/g, "")}`}>{contact.phone}</a>}
-                    <div className="contact-links">
-                      {contact.supportUrl && <a href={contact.supportUrl} target="_blank" rel="noreferrer">Открыть помощь ↗</a>}
-                      <a href={contact.sourceUrl} target="_blank" rel="noreferrer">Официальный источник ↗</a>
-                    </div>
-                  </article>
-                ))}
-              </div>
+          <section className="support-actions-panel" aria-labelledby="support-actions-title">
+            <div className="support-results-heading">
+              <div><h2 id="support-actions-title">Что сделать сейчас</h2>{support.departureTime && <p>Ваш исходный вылет: <strong>{support.departureTime}</strong></p>}</div>
+              <span>{support.actions.length} из 3 действий</span>
+            </div>
+            {support.actions.length > 0 ? (
+              <ol className="support-action-list">
+                {support.actions.map((action, index) => <SupportActionItem action={action} number={index + 1} key={action.id} />)}
+              </ol>
             ) : (
-              <div className="no-contacts"><p>Точных контактов пока нет.</p><span>Обратитесь на стойку информации в аэропорту или добавьте авиакомпанию.</span></div>
+              <div className="no-contacts"><p>Проверенных ссылок пока нет.</p><span>Уточните авиакомпанию или обратитесь на стойку информации.</span></div>
             )}
           </section>
 
-          <section className="action-plan" aria-labelledby="plan-title">
-            <h2 id="plan-title">Что сделать сейчас</h2>
-            <ol>{support.actionPlan.map((item, index) => <li key={item}><span>{index + 1}</span><p>{item}</p></li>)}</ol>
-          </section>
+          {support.misses.length > 0 && (
+            <div className="directory-miss">Для части данных пока нет проверенной ссылки — ничего не стали придумывать.</div>
+          )}
+          {!form.sellerId && (
+            <p className="seller-hint">Не помните продавца? Проверьте письмо с билетом или приложение, где оформляли заказ.</p>
+          )}
         </div>
       )}
     </main>
+  );
+}
+
+function SupportActionItem({ action, number }: { action: SupportAction; number: number }) {
+  return (
+    <li className="support-action-item">
+      <span className="support-action-number">{number}</span>
+      <div className="support-action-copy">
+        <span>{action.entityName}</span>
+        <h3>{action.title}</h3>
+        <p>{action.description}</p>
+        {action.verifiedAt && <small>✓ Официальная ссылка</small>}
+      </div>
+      <a
+        className="secondary-button support-action-link"
+        href={action.url}
+        target="_blank"
+        rel="noreferrer"
+        onClick={() => trackSupportEvent("support_action_clicked", {
+          action: action.category,
+          entityType: action.entityType,
+          entityId: action.entityId,
+        })}
+      >
+        {action.actionLabel}
+      </a>
+    </li>
   );
 }

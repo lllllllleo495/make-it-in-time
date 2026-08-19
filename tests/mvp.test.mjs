@@ -90,9 +90,8 @@ test("server-renders the Успеть product instead of the starter", async () 
 
   const html = await response.text();
   assert.match(html, /<title>Успеть/);
-  assert.match(html, /Куда нужно успеть/);
+  assert.match(html, /Поможем успеть/);
   assert.match(html, /Продолжить/);
-  assert.match(html, /Все идет по плану/);
   assert.match(html, /Где вы сейчас/);
   assert.match(html, /Куда нужно попасть/);
   assert.match(html, /Быть на месте не позже/);
@@ -210,7 +209,7 @@ test("rejects search when ready time is not before the deadline", async () => {
   assert.match(body.issues[0].message, /Дедлайн/);
 });
 
-test("support is requested separately from route search", async () => {
+test("support returns intent-based actions in a deterministic order", async () => {
   const response = await request("/api/support", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -219,15 +218,59 @@ test("support is requested separately from route search", async () => {
       disruptionType: "cancelled",
       airlineId: "aeroflot",
       sellerId: "tutu",
-      flightNumber: "SU 15",
+      departureTime: "14:30",
     }),
   });
   const body = await response.json();
 
   assert.equal(response.status, 200);
   assert.deepEqual(
-    body.contacts.map((contact) => contact.type),
-    ["airline", "airport", "seller"],
+    body.actions.map((action) => action.category),
+    ["flight_status", "ticket", "location"],
   );
-  assert.match(body.actionPlan[0], /пересадить/);
+  assert.deepEqual(body.actions.map((action) => action.priority), [1, 2, 3]);
+  assert.equal(body.departureTime, "14:30");
+  assert.equal(body.actions[0].url, "https://www.aeroflot.ru/ru-ru/help");
+  assert.equal(body.actions[1].url, "https://www.tutu.ru/feedback.php");
+  assert.equal(body.actions[2].url, "https://pulkovoairport.ru/passengers/");
+});
+
+test("support works without a seller and does not create an empty action", async () => {
+  const response = await request("/api/support", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      currentPlaceId: "pulkovo",
+      airlineId: "aeroflot",
+    }),
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(
+    body.actions.map((action) => action.category),
+    ["flight_status", "location"],
+  );
+});
+
+test("unknown support entity is reported without an invented link", async () => {
+  const response = await request("/api/support", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      currentPlaceId: "pulkovo",
+      airlineId: "unknown-airline",
+      sellerId: "tutu",
+    }),
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(
+    body.actions.map((action) => action.category),
+    ["ticket", "location"],
+  );
+  assert.deepEqual(body.misses, [
+    { entityType: "airline", entityId: "unknown-airline" },
+  ]);
 });

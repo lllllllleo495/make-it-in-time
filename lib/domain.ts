@@ -96,8 +96,8 @@ export type RescueSearchRequest = z.infer<typeof rescueSearchRequestSchema>;
 
 export const supportRequestSchema = z.object({
   currentPlaceId: z.string().min(1),
-  disruptionType: z.enum(["cancelled", "delayed"]),
-  flightNumber: z.string().trim().max(16).optional(),
+  disruptionType: z.enum(["cancelled", "delayed"]).optional(),
+  departureTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   airlineId: z.string().optional(),
   sellerId: z.string().optional(),
 });
@@ -142,17 +142,27 @@ export type MissedOption = TravelOffer & {
 
 export type CurrentJourneyStatus = "fits" | "misses" | "unknown" | "cancelled";
 
-export type SupportContact = {
+export type SupportAction = {
   id: string;
-  type: "airline" | "airport" | "seller";
-  name: string;
+  priority: number;
+  category: "flight_status" | "ticket" | "location";
+  entityType: "airline" | "seller" | "location";
+  entityId: string;
+  entityName: string;
+  title: string;
   description: string;
-  phone?: string;
-  hours?: string;
-  websiteUrl: string;
-  supportUrl?: string;
-  sourceUrl: string;
-  lastVerifiedAt: string;
+  actionLabel: string;
+  url: string;
+  verifiedAt?: string;
+};
+
+export type SupportResponse = {
+  actions: SupportAction[];
+  misses: Array<{
+    entityType: "airline" | "seller" | "location";
+    entityId: string;
+  }>;
+  departureTime?: string;
 };
 
 export type SearchResponse = {
@@ -162,8 +172,5 @@ export type SearchResponse = {
   currentJourneyStatus: CurrentJourneyStatus;
   searchedAt: string;
   dataSource: "fixture" | "tutu-mcp";
-  support: {
-    contacts: SupportContact[];
-    actionPlan: string[];
-  };
+  support: SupportResponse;
 };
